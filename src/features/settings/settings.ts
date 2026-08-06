@@ -15,7 +15,7 @@ export type PublicSettings = {
 
 export const SETTINGS_VERSION_KEY = 'settings_updated_at'
 
-export async function getPublicSettings() {
-  return apiFetch<PublicSettings>('/settings')
+export async function getPublicSettings(opts?: { signal?: AbortSignal }) {
+  return apiFetch<PublicSettings>('/settings', undefined, { signal: opts?.signal })
 }
 

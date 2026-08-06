@@ -83,7 +83,7 @@ export default function AdminShell() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-50 text-slate-900">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-4 lg:grid-cols-[296px_1fr]">
+      <div className="mx-auto w-full grid grid-cols-1 gap-6 px-4 py-4 lg:grid-cols-[296px_minmax(0,1fr)] 2xl:px-8 2xl:gap-8">
         <aside className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-blue-900 via-blue-800 to-blue-900 p-5 shadow-2xl shadow-blue-900/20">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-br from-orange-500/10 via-transparent to-transparent" />
 

@@ -30,6 +30,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [loading, setLoading] = useState(false)
   const lastUpdatedAtRef = useRef<string | null>(null)
+  const reloadAbortRef = useRef<AbortController | null>(null)
 
   const applySideEffects = useCallback((next: PublicSettings) => {
     const faviconUrl = typeof next.branding?.faviconUrl === 'string' ? (next.branding as any).faviconUrl : null
@@ -37,22 +38,39 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const reload = useCallback(async () => {
+    if (reloadAbortRef.current) {
+      reloadAbortRef.current.abort()
+    }
+    const ac = new AbortController()
+    reloadAbortRef.current = ac
     setLoading(true)
     try {
-      const next = await getPublicSettings()
+      const next = await getPublicSettings({ signal: ac.signal })
+      if (ac.signal.aborted) return
       setSettings(next)
       if (next.updatedAt) {
         lastUpdatedAtRef.current = next.updatedAt
         localStorage.setItem(SETTINGS_VERSION_KEY, next.updatedAt)
       }
       applySideEffects(next)
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return
     } finally {
-      setLoading(false)
+      if (!ac.signal.aborted) {
+        setLoading(false)
+        if (reloadAbortRef.current === ac) reloadAbortRef.current = null
+      }
     }
   }, [applySideEffects])
 
   useEffect(() => {
     reload().catch(() => null)
+    return () => {
+      if (reloadAbortRef.current) {
+        reloadAbortRef.current.abort()
+        reloadAbortRef.current = null
+      }
+    }
   }, [reload])
 
   useEffect(() => {

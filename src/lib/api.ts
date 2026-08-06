@@ -19,11 +19,11 @@ async function refreshAccessToken() {
   return data.accessToken
 }
 
-export async function apiFetch<T>(input: string, init?: RequestInit): Promise<T> {
-  return apiFetchWithRetry<T>(input, init, true)
+export async function apiFetch<T>(input: string, init?: RequestInit, opts?: { signal?: AbortSignal }): Promise<T> {
+  return apiFetchWithRetry<T>(input, init, true, opts?.signal)
 }
 
-async function apiFetchWithRetry<T>(input: string, init: RequestInit | undefined, canRetry: boolean): Promise<T> {
+async function apiFetchWithRetry<T>(input: string, init: RequestInit | undefined, canRetry: boolean, signal?: AbortSignal): Promise<T> {
   const accessToken = getStoredAccessToken()
 
   const headers = new Headers(init?.headers ?? {})
@@ -38,6 +38,7 @@ async function apiFetchWithRetry<T>(input: string, init: RequestInit | undefined
     ...init,
     headers,
     credentials: 'include',
+    signal,
   })
 
   if (res.status === 401 && canRetry && accessToken) {
