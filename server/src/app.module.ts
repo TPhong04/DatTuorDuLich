@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { AdminModule } from './admin/admin.module'
 import { AuthModule } from './auth/auth.module'
 import { BookingsModule } from './bookings/bookings.module'
+import { DashboardsModule } from './dashboards/dashboards.module'
+import { ReportsModule } from './reports/reports.module'
 import { StaffModule } from './staff/staff.module'
 import { ToursModule } from './tours/tours.module'
 import { UsersModule } from './users/users.module'
@@ -37,6 +39,8 @@ const envSchema = z.object({
     BookingsModule,
     StaffModule,
     AdminModule,
+    DashboardsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
