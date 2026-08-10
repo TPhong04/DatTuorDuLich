@@ -34,7 +34,7 @@ export class AuthController {
     return {
       accessToken: result.tokens.accessToken,
       user: {
-        id: result.user.id,
+        id: String((result.user._id as any)?.toString() ?? result.user.id),
         name: result.user.name,
         email: result.user.email,
         phone: result.user.phone,
@@ -88,7 +88,7 @@ export class AuthController {
     const dbUser = await this.usersService.findById(user.sub)
     if (!dbUser) return null
     return {
-      id: dbUser.id,
+      id: String((dbUser._id as any)?.toString() ?? dbUser.id),
       name: dbUser.name,
       email: dbUser.email,
       phone: dbUser.phone,
@@ -114,7 +114,7 @@ export class AuthController {
     return {
       accessToken: result.tokens.accessToken,
       user: {
-        id: result.user.id,
+        id: String((result.user._id as any)?.toString() ?? result.user.id),
         name: result.user.name,
         email: result.user.email,
         phone: result.user.phone,

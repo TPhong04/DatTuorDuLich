@@ -147,6 +147,24 @@ export class Booking {
   @Prop({ type: Date, default: null })
   cancelledAt!: Date | null
 
+  @Prop({ type: Boolean, required: true, default: false, index: true })
+  isGroupTour!: boolean
+
+  @Prop({ type: String, default: null, trim: true })
+  groupCompanyName!: string | null
+
+  @Prop({ type: String, default: null, trim: true })
+  groupContactPerson!: string | null
+
+  @Prop({ type: String, default: null, trim: true })
+  groupContactRole!: string | null
+
+  @Prop({ type: String, default: null, trim: true })
+  groupUploadedListFileUrl!: string | null
+
+  @Prop({ type: String, default: null, trim: true })
+  groupNote!: string | null
+
   @Prop({ type: Date, default: null })
   confirmedAt!: Date | null
 

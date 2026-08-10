@@ -5,9 +5,13 @@ import { z } from 'zod'
 
 import { AdminModule } from './admin/admin.module'
 import { AuthModule } from './auth/auth.module'
+import { BannersModule } from './banners/banners.module'
 import { BookingsModule } from './bookings/bookings.module'
 import { DashboardsModule } from './dashboards/dashboards.module'
+import { GroupTourRequestsModule } from './group-tour-requests/group-tour-requests.module'
+import { PostsModule } from './posts/posts.module'
 import { ReportsModule } from './reports/reports.module'
+import { ReviewsModule } from './reviews/reviews.module'
 import { StaffModule } from './staff/staff.module'
 import { ToursModule } from './tours/tours.module'
 import { UsersModule } from './users/users.module'
@@ -41,6 +45,10 @@ const envSchema = z.object({
     AdminModule,
     DashboardsModule,
     ReportsModule,
+    BannersModule,
+    PostsModule,
+    ReviewsModule,
+    GroupTourRequestsModule,
   ],
 })
 export class AppModule {}

@@ -2,7 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useMemo, useRef, use
 
 import { cn } from '@/lib/utils'
 
-type ToastVariant = 'success' | 'error'
+type ToastVariant = 'success' | 'error' | 'warning'
 
 type ToastItem = {
   id: string
@@ -13,6 +13,7 @@ type ToastItem = {
 type ToastApi = {
   success: (message: string) => void
   error: (message: string) => void
+  warning: (message: string) => void
 }
 
 const ToastContext = createContext<ToastApi | null>(null)
@@ -48,6 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     () => ({
       success: (message) => push('success', message),
       error: (message) => push('error', message),
+      warning: (message) => push('warning', message),
     }),
     [push],
   )
@@ -64,6 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               'pointer-events-auto w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl px-4 py-3 text-sm font-semibold shadow-lg ring-1',
               t.variant === 'success' && 'bg-emerald-600 text-white ring-emerald-600/30',
               t.variant === 'error' && 'bg-orange-600 text-white ring-orange-600/30',
+              t.variant === 'warning' && 'bg-amber-500 text-white ring-amber-500/30',
             )}
             role="status"
           >

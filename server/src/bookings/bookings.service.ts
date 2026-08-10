@@ -120,6 +120,8 @@ export class BookingsService {
   }
 
   assertPassengersMatchCounts(payload: CreateBookingPayload) {
+    const isGroup = Boolean((payload as any).isGroupTour)
+    if (isGroup) return
     const passengers: BookingPassenger[] = payload.passengers as any
     const counts = { NL: 0, TE: 0, EB: 0 }
     for (const p of passengers) counts[p.type] = (counts[p.type] || 0) + 1
@@ -160,14 +162,22 @@ export class BookingsService {
     const code = await this.generateBookingCode()
     const departureDate = toDateLocal(dep.departureDate)
     const holdsUntil = new Date(Date.now() + 15 * 60 * 1000)
-    const passengersClean: BookingPassenger[] = (payload.passengers as any[]).map((p) => ({
-      fullName: String(p?.fullName || '').trim(),
-      type: p?.type || 'NL',
-      birthDate: p?.birthDate ? new Date(p.birthDate) : null,
-      gender: p?.gender ?? null,
-      idCard: typeof p?.idCard === 'string' ? p.idCard.trim() || null : null,
-      notes: typeof p?.notes === 'string' ? p.notes.trim() || null : null,
-    }))
+    const isGroup = Boolean((payload as any).isGroupTour)
+    let passengersClean: BookingPassenger[] = []
+    if (isGroup) {
+      for (let i = 0; i < (payload.adultCount || 0); i += 1) passengersClean.push({ fullName: `[Đoàn] Người lớn ${i + 1}`, type: 'NL', birthDate: null, gender: null, idCard: null, notes: null })
+      for (let i = 0; i < (payload.childCount || 0); i += 1) passengersClean.push({ fullName: `[Đoàn] Trẻ em ${i + 1}`, type: 'TE', birthDate: null, gender: null, idCard: null, notes: null })
+      for (let i = 0; i < (payload.infantCount || 0); i += 1) passengersClean.push({ fullName: `[Đoàn] Em bé ${i + 1}`, type: 'EB', birthDate: null, gender: null, idCard: null, notes: null })
+    } else {
+      passengersClean = (payload.passengers as any[]).map((p) => ({
+        fullName: String(p?.fullName || '').trim(),
+        type: p?.type || 'NL',
+        birthDate: p?.birthDate ? new Date(p.birthDate) : null,
+        gender: p?.gender ?? null,
+        idCard: typeof p?.idCard === 'string' ? p.idCard.trim() || null : null,
+        notes: typeof p?.notes === 'string' ? p.notes.trim() || null : null,
+      }))
+    }
     const surchargesClean: BookingSurchargeLine[] = (payload.surcharges ?? []).map((s: any) => ({
       label: String(s?.label || '').trim(),
       quantity: Math.max(0, Number(s?.quantity) || 0),
@@ -206,6 +216,12 @@ export class BookingsService {
       createdBy,
       status: 'new',
       holdsUntil,
+      isGroupTour: isGroup,
+      groupCompanyName: typeof (payload as any).groupCompanyName === 'string' ? (payload as any).groupCompanyName.trim() || null : null,
+      groupContactPerson: typeof (payload as any).groupContactPerson === 'string' ? (payload as any).groupContactPerson.trim() || null : null,
+      groupContactRole: typeof (payload as any).groupContactRole === 'string' ? (payload as any).groupContactRole.trim() || null : null,
+      groupUploadedListFileUrl: typeof (payload as any).groupUploadedListFileUrl === 'string' ? (payload as any).groupUploadedListFileUrl.trim() || null : null,
+      groupNote: typeof (payload as any).groupNote === 'string' ? (payload as any).groupNote.trim() || null : null,
     } as any)
     // #region debug-point booking-create-500
     await dbg('svc.doc_created', { code, _id: doc._id?.toString?.() ?? null })

@@ -35,6 +35,7 @@ import AdminBookingsPage from '@/pages/admin/AdminBookingsPage'
 import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 import AdminContentBannersPage from '@/pages/admin/AdminContentBannersPage'
 import AdminContentPostsPage from '@/pages/admin/AdminContentPostsPage'
+import AdminContentReviewsPage from '@/pages/admin/AdminContentReviewsPage'
 import AdminDeparturesPage from '@/pages/admin/AdminDeparturesPage'
 import AdminGroupTourRequestsPage from '@/pages/admin/AdminGroupTourRequestsPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
@@ -53,6 +54,7 @@ import AdminSettingsSecurityPage from '@/pages/admin/settings/AdminSettingsSecur
 import AdminSettingsIntegrationsPage from '@/pages/admin/settings/AdminSettingsIntegrationsPage'
 import AdminSettingsMasterDataPage from '@/pages/admin/settings/AdminSettingsMasterDataPage'
 import StaffBookingsPage from '@/pages/staff/StaffBookingsPage'
+import StaffContentReviewsPage from '@/pages/staff/StaffContentReviewsPage'
 import StaffDeparturesPage from '@/pages/staff/StaffDeparturesPage'
 import StaffGroupTourRequestsPage from '@/pages/staff/StaffGroupTourRequestsPage'
 import StaffToursPage from '@/pages/staff/StaffToursPage'
@@ -112,6 +114,8 @@ export default function App() {
               <Route path="tours" element={<StaffToursPage />} />
               <Route path="departures" element={<StaffDeparturesPage />} />
               <Route path="group-tour-requests" element={<StaffGroupTourRequestsPage />} />
+              <Route path="content/posts" element={<AdminContentPostsPage />} />
+              <Route path="content/reviews" element={<StaffContentReviewsPage />} />
             </Route>
           </Route>
 
@@ -126,6 +130,7 @@ export default function App() {
               <Route path="bookings" element={<AdminBookingsPage />} />
               <Route path="group-tour-requests" element={<AdminGroupTourRequestsPage />} />
               <Route path="content/posts" element={<AdminContentPostsPage />} />
+              <Route path="content/reviews" element={<AdminContentReviewsPage />} />
               <Route path="content/banners" element={<AdminContentBannersPage />} />
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="audit-logs" element={<AdminAuditLogsPage />} />

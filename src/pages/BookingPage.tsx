@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { useToast } from '@/components/notifications/ToastProvider'
@@ -31,7 +31,7 @@ function WizardSteps({ step }: { step: 1 | 2 | 3 | 4 }) {
   const labels = ['Chọn đợt & số khách', 'Thông tin hành khách', 'Thanh toán & xác nhận', 'Đặt thành công'] as const
   return (
     <div className="w-full border-b border-slate-200 bg-white">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 overflow-x-auto px-4 py-5">
+      <div className="mx-auto flex w-full max-w-[1640px] items-center gap-2 overflow-x-auto px-4 py-5 2xl:px-6">
         {labels.map((label, idx) => {
           const i = (idx + 1) as 1 | 2 | 3 | 4
           const active = i === step
@@ -158,8 +158,10 @@ function SidebarSummary({ tour, dep }: { tour: PublicTourDetail | null; dep: Pub
 }
 
 function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDetail | null; toast: ReturnType<typeof useToast> }) {
-  const { draft, setDepartureId, setPax } = useBookingWizard()
-  const nextDep = useMemo(() => (tour?.departures || []).find((d) => d.status === 'open'), [tour?.departures])
+  const { draft, setDepartureId, setPax, setTourSlug } = useBookingWizard()
+  useEffect(() => {
+    if (tour?.slug && draft.tourSlug !== tour.slug) setTourSlug(tour.slug)
+  }, [tour?.slug, draft.tourSlug])
   const selectedDep = useMemo(() => {
     if (!tour) return null
     const list = tour.departures || []
@@ -167,11 +169,8 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
       const exact = list.find((d) => d.id === draft.departureId)
       if (exact) return exact
     }
-    return nextDep ?? null
-  }, [tour, draft.departureId, nextDep])
-  useEffect(() => {
-    if (selectedDep?.id && selectedDep.id !== draft.departureId) setDepartureId(selectedDep.id)
-  }, [selectedDep?.id])
+    return list.find((d) => d.status === 'open') ?? list[0] ?? null
+  }, [tour, draft.departureId])
   return (
     <div className="space-y-5">
       <SectionCard title="1. Chọn đợt khởi hành" desc="Chọn ngày khởi hành phù hợp lịch trình và ngân sách của bạn.">
@@ -187,8 +186,9 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
             {tour?.departures?.length ? tour.departures.map((d) => {
               const active = selectedDep?.id === d.id
               const disabled = d.status === 'closed' || d.status === 'cancelled' || d.status === 'soldout'
+              const depId = d.id ?? String(d.departureDate)
               return (
-                <button type="button" onClick={() => !disabled && d.id && setDepartureId(d.id)} key={d.id || String(d.departureDate)} disabled={disabled} className={'grid w-full grid-cols-12 gap-3 items-center px-4 py-3 text-left text-sm transition ' + (active ? 'bg-orange-50/80' : 'hover:bg-slate-50') + (disabled ? ' opacity-60 cursor-not-allowed' : '')}>
+                <button type="button" onClick={() => { if (disabled) return; setDepartureId(depId) }} key={depId} disabled={disabled} className={'grid w-full grid-cols-12 gap-3 items-center px-4 py-3 text-left text-sm transition ' + (active ? 'bg-orange-50/80' : 'hover:bg-slate-50') + (disabled ? ' opacity-60 cursor-not-allowed' : '')}>
                   <div className="col-span-3 font-bold text-slate-800">{formatDate(d.departureDate)}</div>
                   <div className="col-span-2 text-slate-700">{d.standardText || '5 sao'}</div>
                   <div className="col-span-2 text-right">
@@ -338,8 +338,9 @@ function PassengerCard({ idx, passenger, onChange, onRemove, canRemove }: { idx:
 }
 
 function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => void; toast: ReturnType<typeof useToast> }) {
-  const { draft, totalPax } = useBookingWizard()
+  const { draft, totalPax, setGroup } = useBookingWizard()
   const auth = useAuth()
+  const isGroup = Boolean(draft.group?.isGroupTour)
   const [contact, setContact] = useState(() => {
     const u = auth.user
     return {
@@ -357,13 +358,19 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
     return arr
   })
   const [notes, setNotes] = useState('')
+  const [groupFields, setGroupFields] = useState(() => ({
+    companyName: draft.group?.companyName || '',
+    contactPerson: draft.group?.contactPerson || '',
+    contactRole: draft.group?.contactRole || '',
+    uploadedListFileUrl: draft.group?.uploadedListFileUrl || '',
+    note: draft.group?.note || '',
+  }))
   useEffect(() => {
     setPassengers((prev) => {
       const counts = { NL: draft.pax.adult, TE: draft.pax.child, EB: draft.pax.infant }
       const cur = { NL: prev.filter((p) => p.type === 'NL').length, TE: prev.filter((p) => p.type === 'TE').length, EB: prev.filter((p) => p.type === 'EB').length }
       if (cur.NL === counts.NL && cur.TE === counts.TE && cur.EB === counts.EB && prev.length === totalPax) return prev
       const out: BookingPassenger[] = [...prev]
-      // remove extras
       for (const t of ['NL', 'TE', 'EB'] as const) {
         let curT = out.filter((p) => p.type === t).length
         while (curT > counts[t]) {
@@ -373,7 +380,6 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
           if (rm >= 0) { out.splice(rm, 1); curT -= 1 } else break
         }
       }
-      // add missing
       for (const t of ['NL', 'TE', 'EB'] as const) {
         let curT = out.filter((p) => p.type === t).length
         while (curT < counts[t]) { out.push({ fullName: '', type: t, birthDate: null, gender: null, idCard: null, notes: null }); curT += 1 }
@@ -381,14 +387,42 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
       return out.slice(0, totalPax)
     })
   }, [draft.pax.adult, draft.pax.child, draft.pax.infant, totalPax])
-  const [sharedState, setShared] = useState<{ contact: typeof contact; notes: string; passengers: BookingPassenger[] } | null>(null)
+  const [sharedState, setShared] = useState<{ contact: typeof contact; notes: string; passengers: BookingPassenger[]; isGroup: boolean; groupFields: typeof groupFields } | null>(null)
   useEffect(() => {
-    window['__booking_step2'] = { contact, notes, passengers }
-    setShared({ contact, notes, passengers })
-  }, [contact, notes, passengers])
+    ;(window as any)['__booking_step2'] = { contact, notes, passengers, isGroupTour: isGroup, group: groupFields }
+    setShared({ contact, notes, passengers, isGroup, groupFields })
+  }, [contact, notes, passengers, isGroup, groupFields])
   void sharedState
   return (
     <div className="space-y-5">
+      <SectionCard title="Chế độ đặt tour" desc="Chọn Tour lẻ nếu đi ít người, Tour đoàn nếu đi nhóm 10 người trở lên / doanh nghiệp / gia đình lớn.">
+        <div className="grid gap-3 md:grid-cols-2">
+          <button type="button" onClick={() => { setGroup({ isGroupTour: false }) }} className={'rounded-2xl border p-4 text-left transition ' + (!isGroup ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30')}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 text-lg">🧑‍🤝‍🧑</div>
+              <div>
+                <div className="text-sm font-black text-slate-900">Tour Lẻ (tối đa 20 khách)</div>
+                <div className="text-xs text-slate-500">Nhập thông tin từng hành khách (họ tên / ngày sinh / CCCD).</div>
+              </div>
+            </div>
+          </button>
+          <button type="button" onClick={() => { setGroup({ isGroupTour: true }) }} className={'rounded-2xl border p-4 text-left transition ' + (isGroup ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30')}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-orange-600 to-amber-500 text-lg">👔</div>
+              <div>
+                <div className="text-sm font-black text-slate-900">Tour Đoàn (doanh nghiệp / 10+ người)</div>
+                <div className="text-xs text-slate-500">Không cần nhập 100 tên. Upload file danh sách Excel / gửi sau.</div>
+              </div>
+            </div>
+          </button>
+        </div>
+        {isGroup ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-gradient-to-br from-amber-50/60 to-orange-50/40 p-4 text-xs text-amber-800">
+            💡 Bạn không cần nhập Họ tên từng người ngay bây giờ. Hệ thống sẽ tạm tạo danh sách placeholder theo tổng số NL/TE/EB. Bạn sẽ bổ sung danh sách cuối (Excel) qua email nhân viên sau 5-7 ngày trước khởi hành.
+          </div>
+        ) : null}
+      </SectionCard>
+
       <SectionCard title="Thông tin người đặt" desc="Chúng tôi sẽ gọi điện xác nhận đơn đặt của bạn qua SĐT này.">
         <div className="grid gap-3 md:grid-cols-2">
           <div>
@@ -409,21 +443,58 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
           </div>
         </div>
       </SectionCard>
-      <SectionCard title={`Danh sách hành khách (${totalPax} người)`} desc={`NL: ${draft.pax.adult} · TE: ${draft.pax.child} · EB: ${draft.pax.infant}`}>
-        <div className="space-y-3">
-          {passengers.map((p, i) => (
-            <PassengerCard
-              key={i}
-              idx={i}
-              passenger={p}
-              onChange={(np) => setPassengers((list) => list.map((pp, ii) => (ii === i ? np : pp)))}
-            />
-          ))}
-        </div>
+
+      {isGroup ? (
+        <SectionCard title="Thông tin đoàn / công ty" desc="Nhập tên công ty/đoàn + người liên hệ quản lý đoàn. Upload file danh sách hành khách nếu có.">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Tên công ty / Tên đoàn *</label>
+              <input value={groupFields.companyName} onChange={(e) => { setGroupFields((g) => ({ ...g, companyName: e.target.value })); setGroup({ companyName: e.target.value }) }} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Công ty Cổ phần XYZ / Đoàn du lịch gia đình A" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Người liên hệ quản lý đoàn *</label>
+              <input value={groupFields.contactPerson} onChange={(e) => { setGroupFields((g) => ({ ...g, contactPerson: e.target.value })); setGroup({ contactPerson: e.target.value }) }} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Chị Nguyễn Thị B - Trưởng đoàn" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Chức vụ</label>
+              <input value={groupFields.contactRole} onChange={(e) => { setGroupFields((g) => ({ ...g, contactRole: e.target.value })); setGroup({ contactRole: e.target.value }) }} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Trưởng phòng Nhân sự" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Upload file danh sách hành khách (Excel / PDF / Word)</label>
+              <div className="mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                <input value={groupFields.uploadedListFileUrl} onChange={(e) => { setGroupFields((g) => ({ ...g, uploadedListFileUrl: e.target.value })); setGroup({ uploadedListFileUrl: e.target.value }) }} className="flex-1 min-w-[240px] h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400" placeholder="Link Google Drive / đường dẫn file (tùy chọn) — gửi sau cũng được" />
+                {groupFields.uploadedListFileUrl ? (
+                  <a href={groupFields.uploadedListFileUrl} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-lg bg-blue-50 px-4 text-xs font-bold text-blue-700 hover:bg-blue-100">Mở file</a>
+                ) : (
+                  <div className="inline-flex h-11 items-center rounded-lg bg-white px-4 text-xs font-semibold text-slate-500 border border-slate-200">Bỏ trống OK · Gửi sau qua email nhân viên</div>
+                )}
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Yêu cầu riêng cho đoàn</label>
+              <textarea rows={4} value={groupFields.note} onChange={(e) => { setGroupFields((g) => ({ ...g, note: e.target.value })); setGroup({ note: e.target.value }) }} className="w-full resize-y rounded-2xl border border-slate-200 bg-white p-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Phòng 2 người, ăn chay 5 người, xe 45 chỗ, cần hóa đơn VAT 0%, vé sân bay..." />
+            </div>
+          </div>
+        </SectionCard>
+      ) : (
+        <SectionCard title={`Danh sách hành khách (${totalPax} người)`} desc={`NL: ${draft.pax.adult} · TE: ${draft.pax.child} · EB: ${draft.pax.infant}`}>
+          <div className="space-y-3">
+            {passengers.map((p, i) => (
+              <PassengerCard
+                key={i}
+                idx={i}
+                passenger={p}
+                onChange={(np) => setPassengers((list) => list.map((pp, ii) => (ii === i ? np : pp)))}
+              />
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title="Ghi chú chung" desc="Lời nhắn cho chuyên viên tư vấn.">
+        <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full resize-y rounded-2xl border border-slate-200 bg-white p-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Ghi chú..." />
       </SectionCard>
-      <SectionCard title="Ghi chú cho đoàn" desc="Để lại lời nhắn cho chuyên viên tư vấn, yêu cầu ăn kiêng, phòng tầng thấp...">
-        <textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full resize-y rounded-2xl border border-slate-200 bg-white p-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Ghi chú..." />
-      </SectionCard>
+
       <div className="flex items-center justify-between">
         <button type="button" onClick={onPrev} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 text-sm font-extrabold uppercase text-slate-700 hover:bg-slate-50">← Quay lại</button>
         <button
@@ -436,20 +507,41 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
               return toast.error('Email không hợp lệ, vui lòng nhập lại hoặc để trống.')
             }
             const finalContact = { ...contact, email: emailRaw || null, address: (contact.address || '').trim() || null }
-            const missing = passengers.findIndex((p) => !p.fullName.trim())
-            if (missing >= 0) return toast.error(`Hành khách ${missing + 1} chưa nhập Họ tên.`)
-            const counts = { NL: 0, TE: 0, EB: 0 }
-            passengers.forEach((p) => { counts[p.type] += 1 })
-            if (counts.NL !== draft.pax.adult || counts.TE !== draft.pax.child || counts.EB !== draft.pax.infant) {
-              return toast.error(`Tổng số lượng hành khách không khớp NL:${counts.NL}/${draft.pax.adult} · TE:${counts.TE}/${draft.pax.child} · EB:${counts.EB}/${draft.pax.infant}.`)
+            let finalPassengers: BookingPassenger[] = []
+            if (isGroup) {
+              if (!groupFields.companyName.trim()) return toast.error('Vui lòng nhập Tên công ty / Tên đoàn.')
+              if (!groupFields.contactPerson.trim()) return toast.error('Vui lòng nhập Người liên hệ quản lý đoàn.')
+              for (let i = 0; i < draft.pax.adult; i += 1) finalPassengers.push({ fullName: `[Đoàn] Người lớn ${i + 1}`, type: 'NL', birthDate: null, gender: null, idCard: null, notes: null })
+              for (let i = 0; i < draft.pax.child; i += 1) finalPassengers.push({ fullName: `[Đoàn] Trẻ em ${i + 1}`, type: 'TE', birthDate: null, gender: null, idCard: null, notes: null })
+              for (let i = 0; i < draft.pax.infant; i += 1) finalPassengers.push({ fullName: `[Đoàn] Em bé ${i + 1}`, type: 'EB', birthDate: null, gender: null, idCard: null, notes: null })
+            } else {
+              const missing = passengers.findIndex((p) => !p.fullName.trim())
+              if (missing >= 0) return toast.error(`Hành khách ${missing + 1} chưa nhập Họ tên.`)
+              const counts = { NL: 0, TE: 0, EB: 0 }
+              passengers.forEach((p) => { counts[p.type] += 1 })
+              if (counts.NL !== draft.pax.adult || counts.TE !== draft.pax.child || counts.EB !== draft.pax.infant) {
+                return toast.error(`Tổng số lượng hành khách không khớp NL:${counts.NL}/${draft.pax.adult} · TE:${counts.TE}/${draft.pax.child} · EB:${counts.EB}/${draft.pax.infant}.`)
+              }
+              finalPassengers = passengers.map((p) => ({
+                ...p,
+                fullName: p.fullName.trim(),
+                idCard: typeof p.idCard === 'string' ? p.idCard.trim() || null : p.idCard,
+                notes: typeof p.notes === 'string' ? p.notes.trim() || null : p.notes,
+              }))
             }
-            const finalPassengers = passengers.map((p) => ({
-              ...p,
-              fullName: p.fullName.trim(),
-              idCard: typeof p.idCard === 'string' ? p.idCard.trim() || null : p.idCard,
-              notes: typeof p.notes === 'string' ? p.notes.trim() || null : p.notes,
-            }))
-            window['__booking_step2_final'] = { contact: finalContact, notes: notes.trim() || null, passengers: finalPassengers }
+            ;(window as any)['__booking_step2_final'] = {
+              contact: finalContact,
+              notes: notes.trim() || null,
+              passengers: finalPassengers,
+              isGroupTour: isGroup,
+              group: {
+                companyName: groupFields.companyName.trim() || null,
+                contactPerson: groupFields.contactPerson.trim() || null,
+                contactRole: groupFields.contactRole.trim() || null,
+                uploadedListFileUrl: groupFields.uploadedListFileUrl.trim() || null,
+                note: groupFields.note.trim() || null,
+              },
+            }
             onNext()
           }}
           className="inline-flex h-12 items-center justify-center rounded-2xl bg-orange-500 px-8 text-sm font-extrabold uppercase text-white shadow-sm shadow-orange-500/30 hover:bg-orange-600"
@@ -645,14 +737,32 @@ export default function BookingPage() {
     return () => { mounted = false }
   }, [slug])
 
+  const dFromUrl = sp.get('d')
+  const appliedUrlDepRef = useRef<{ d: string | null; applied: boolean }>({ d: null, applied: false })
+
   useEffect(() => {
     if (!tour?.departures?.length) return
-    const d = sp.get('d')
-    if (d) {
-      const matched = tour.departures.find((x) => x.id === d || String(x.id) === d)
-      if (matched?.id && matched.id !== draft.departureId) setDepartureId(matched.id)
+    if (dFromUrl === appliedUrlDepRef.current.d && appliedUrlDepRef.current.applied) return
+    const cur = appliedUrlDepRef.current.d
+    if (cur === dFromUrl) {
+      appliedUrlDepRef.current.applied = true
+      return
     }
-  }, [tour?.departures, draft.departureId, setDepartureId, sp])
+    appliedUrlDepRef.current.d = dFromUrl
+    if (dFromUrl) {
+      const matched = tour.departures.find((x) => x.id === dFromUrl || String(x.id) === dFromUrl)
+      if (matched?.id && matched.id !== draft.departureId) {
+        setDepartureId(matched.id)
+      } else if (!matched) {
+        const fallback = tour.departures.find((d) => d.status === 'open') ?? tour.departures[0] ?? null
+        if (fallback?.id && fallback.id !== draft.departureId) setDepartureId(fallback.id)
+      }
+    } else {
+      const fallback = tour.departures.find((d) => d.status === 'open') ?? tour.departures[0] ?? null
+      if (fallback?.id && !draft.departureId) setDepartureId(fallback.id)
+    }
+    appliedUrlDepRef.current.applied = true
+  }, [tour?.departures, dFromUrl])
 
   const selectedDep = useMemo<PublicTourDeparture | null>(() => {
     if (!tour?.departures?.length) return null
@@ -663,7 +773,7 @@ export default function BookingPage() {
     return tour.departures.find((d) => d.status === 'open') ?? tour.departures[0] ?? null
   }, [tour, draft.departureId])
 
-  if (loadingTour) return <div className="mx-auto w-full max-w-6xl px-4 py-16 text-sm text-slate-500">Đang tải thông tin đặt tour...</div>
+  if (loadingTour) return <div className="mx-auto w-full max-w-[1640px] px-4 py-16 text-sm text-slate-500 2xl:px-6">Đang tải thông tin đặt tour...</div>
   if (errTour || !tour) return (
     <div className="mx-auto w-full max-w-3xl px-4 py-16 text-center">
       <h1 className="text-2xl font-extrabold text-slate-900">Không tìm thấy tour</h1>
@@ -677,7 +787,7 @@ export default function BookingPage() {
   return (
     <div>
       <WizardSteps step={step} />
-      <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="mx-auto grid w-full max-w-[1640px] gap-6 px-4 py-8 2xl:px-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0">
           <div className="mb-5">
             <h1 className="text-2xl font-black text-slate-900">
@@ -700,6 +810,8 @@ export default function BookingPage() {
                   const contact = s2.contact
                   const passengers = s2.passengers
                   const notes = s2.notes
+                  const isGroupTour = Boolean(s2.isGroupTour)
+                  const group = s2.group || {}
                   if (!selectedDep?.id) return toast.error('Không xác định được đợt khởi hành, vui lòng thử lại.')
                   if (!draft.tourSlug) return toast.error('Thông tin tour không hợp lệ, hãy thử lại.')
                   // #region debug-point booking-create-500
@@ -714,7 +826,13 @@ export default function BookingPage() {
                     surcharges,
                     paymentMethod: method,
                     agreeTerms: true,
-                  }
+                    isGroupTour,
+                    groupCompanyName: group.companyName || null,
+                    groupContactPerson: group.contactPerson || null,
+                    groupContactRole: group.contactRole || null,
+                    groupUploadedListFileUrl: group.uploadedListFileUrl || null,
+                    groupNote: group.note || null,
+                  } as any
                   try {
                     await fetch('http://127.0.0.1:7777/event', {
                       method: 'POST',

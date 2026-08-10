@@ -122,7 +122,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full">
       <div className="border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
+        <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center justify-between gap-3 px-4 2xl:px-6">
           <Link className="flex items-center gap-2" to="/">
             <img alt="Logo" className="h-9 w-9 rounded-full object-contain" src={logoUrl} />
             <div className="leading-tight">
@@ -224,7 +224,7 @@ export default function Header() {
         </div>
 
         <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900">
-          <div className="mx-auto max-w-6xl px-2">
+          <div className="mx-auto w-full max-w-[1680px] px-4 2xl:px-6">
             <div className="flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {categoryItems.map((item) => {
                 const active = item.to === activeCategoryTo
@@ -247,7 +247,7 @@ export default function Header() {
         </div>
 
         <div className={cn('border-t border-slate-200 bg-white lg:hidden', !mobileOpen && 'hidden')}>
-          <div className="mx-auto max-w-6xl space-y-2 px-4 py-4">
+          <div className="mx-auto w-full max-w-[1680px] space-y-2 px-4 py-4 2xl:px-6">
             <form className="flex items-center gap-2 rounded-2xl bg-slate-50 p-2" onSubmit={onSearch}>
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

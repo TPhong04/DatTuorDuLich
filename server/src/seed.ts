@@ -2,17 +2,208 @@ import 'reflect-metadata'
 
 import { NestFactory } from '@nestjs/core'
 import bcrypt from 'bcryptjs'
+import { Types } from 'mongoose'
 
 import { AppModule } from './app.module'
 import { BookingsService } from './bookings/bookings.service'
 import { ToursService } from './tours/tours.service'
 import { UsersService } from './users/users.service'
+import { GroupTourRequestsService } from './group-tour-requests/group-tour-requests.service'
+import { GroupTourRequestStatus, GroupTourRequestPriority } from './group-tour-requests/group-tour-request.schema'
+
+type SeedStaff = { _id: Types.ObjectId; name: string; email: string; phone: string }
+
+const STAFF_SEED: Array<{ name: string; email: string; phone: string; password: string }> = [
+  { name: 'Phan Thị Thanh Hoài', email: 'hoai.ptt@congtydulich.vn', phone: '0913111222', password: 'Staff@12345' },
+  { name: 'Trần Thế Định', email: 'dinh.tt@congtydulich.vn', phone: '0123456789', password: 'Staff@12345' },
+  { name: 'Nguyễn Thị Lan Anh', email: 'lananh.nt@congtydulich.vn', phone: '0914222333', password: 'Staff@12345' },
+  { name: 'Lê Hoàng Nam', email: 'nam.lh@congtydulich.vn', phone: '0915333444', password: 'Staff@12345' },
+  { name: 'Hoàng Thu Trang', email: 'trang.ht@congtydulich.vn', phone: '0916444555', password: 'Staff@12345' },
+]
+
+async function seedStaff(users: UsersService): Promise<SeedStaff[]> {
+  const out: SeedStaff[] = []
+  for (const s of STAFF_SEED) {
+    let doc = await users.findByEmail(s.email)
+    if (!doc) {
+      const pwHash = await bcrypt.hash(s.password, 10)
+      doc = await users.createUser({
+        name: s.name,
+        email: s.email,
+        phone: s.phone,
+        passwordHash: pwHash,
+        role: 'staff',
+      })
+    }
+    out.push({
+      _id: new Types.ObjectId((doc._id as any)?.toString() ?? doc.id),
+      name: doc.name,
+      email: doc.email,
+      phone: doc.phone ?? s.phone,
+    })
+  }
+  return out
+}
+
+async function seedGroupTourRequests(svc: GroupTourRequestsService, staffList: SeedStaff[]) {
+  const count = await svc.list({ page: 1, pageSize: 1 }, null)
+  if (count.total >= 5) return
+  const staff = (idx: number) => staffList[idx % staffList.length]
+  const mkDate = (offsetDays: number) => new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000).toISOString()
+  const rows: Array<{
+    status: GroupTourRequestStatus; priority: GroupTourRequestPriority;
+    contactName: string; contactPhone: string; contactEmail: string | null; contactRole: string | null;
+    companyOrGroupName: string; companyTaxCode: string | null;
+    adultCount: number; childCount: number; infantCount: number;
+    departureCity: string; destination: string; approximateDurationText: string;
+    preferredStartDate: string | null;
+    hotelClassRequested: string | null;
+    servicesPreference: { needVisa: boolean; needFlight: boolean; needBus: boolean; needHotel: boolean; needMeals: boolean; needGuide: boolean };
+    budgetPerPersonVnd: number | null; totalBudgetVnd: number | null;
+    assignedStaff: SeedStaff | null;
+    specialRequirements?: string | null;
+    lastQuoteSummary?: string | null;
+    quoteCount?: number;
+    lostReason?: string | null;
+    wonAt?: string | null;
+  }> = [
+    {
+      status: 'quoting', priority: 'normal',
+      contactName: 'Chị Nguyễn Thị Kim Oanh', contactPhone: '0909666123', contactEmail: 'oanh.kt@congtyabc.vn', contactRole: 'Trưởng phòng HCNS',
+      companyOrGroupName: 'Công ty TNHH ABC (Miền Tây)', companyTaxCode: '6000999111',
+      adultCount: 80, childCount: 15, infantCount: 12,
+      departureCity: 'TP. Hồ Chí Minh', destination: 'Hà Nội - Ninh Bình - Sapa', approximateDurationText: '4 ngày 3 đêm',
+      preferredStartDate: mkDate(30), hotelClassRequested: '4 sao',
+      servicesPreference: { needVisa: false, needFlight: true, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 6500000, totalBudgetVnd: 695500000,
+      assignedStaff: staff(0),
+      specialRequirements: 'Cần 2 xe 45 chỗ Limousine, 30 phòng đôi + 10 phòng 3 người, ăn chay 12 người, cần phòng họp team building 1 buổi tối.',
+      lastQuoteSummary: null, quoteCount: 0,
+    },
+    {
+      status: 'contacted', priority: 'normal',
+      contactName: 'Anh Trần Văn Minh', contactPhone: '0902888456', contactEmail: 'minh.tv@tnhh-xaydung.vn', contactRole: 'Phó Giám đốc',
+      companyOrGroupName: 'Công ty TNHH Xây dựng Lào Cai', companyTaxCode: '3000222333',
+      adultCount: 45, childCount: 10, infantCount: 8,
+      departureCity: 'Hà Nội', destination: 'Lào Cai - Fansipan - Cát Cát - Hà Giang', approximateDurationText: '5 ngày 4 đêm',
+      preferredStartDate: mkDate(32), hotelClassRequested: '4 sao',
+      servicesPreference: { needVisa: false, needFlight: false, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 5500000, totalBudgetVnd: 346500000,
+      assignedStaff: staff(1),
+      specialRequirements: 'Thang máy khách sạn, ăn ít rau muống, cần xe 29 chỗ 2 chiếc, hỗ trợ VAT 0% xuất hóa đơn.',
+      lastQuoteSummary: null, quoteCount: 0,
+    },
+    {
+      status: 'new', priority: 'urgent',
+      contactName: 'Chị Lê Thị Thúy', contactPhone: '0988123456', contactEmail: 'thuy.lt@corp-xyz.vn', contactRole: 'Giám đốc Điều hành',
+      companyOrGroupName: 'Tập đoàn XYZ Group (Hà Nội)', companyTaxCode: '0100777888',
+      adultCount: 50, childCount: 0, infantCount: 0,
+      departureCity: 'Hà Nội', destination: 'Hạ Long Bay - Yacht Party', approximateDurationText: '2 ngày 1 đêm',
+      preferredStartDate: mkDate(7), hotelClassRequested: '5 sao',
+      servicesPreference: { needVisa: false, needFlight: false, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 4800000, totalBudgetVnd: 240000000,
+      assignedStaff: null,
+      specialRequirements: 'Cần du thuyền 5 sao President 12 cabin, team building tối bãi biển Tuần Châu, có live band.',
+    },
+    {
+      status: 'negotiating', priority: 'high',
+      contactName: 'Anh Đinh Hoàng Việt', contactPhone: '0977000123', contactEmail: 'viet.dh@fsoft-corp.com', contactRole: 'HR Senior Manager',
+      companyOrGroupName: 'Công ty Phần mềm F-Corp', companyTaxCode: '0100456789',
+      adultCount: 120, childCount: 0, infantCount: 0,
+      departureCity: 'Hà Nội', destination: 'Đà Nẵng - Hội An - Bà Nà Hills', approximateDurationText: '3 ngày 2 đêm',
+      preferredStartDate: mkDate(45), hotelClassRequested: '4-5 sao',
+      servicesPreference: { needVisa: false, needFlight: true, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 7200000, totalBudgetVnd: 864000000,
+      assignedStaff: staff(2),
+      lastQuoteSummary: 'Gói 1: VJ Air + Novotel 4* + Xe 3 chiếc 45 chỗ = 7.200.000đ/khách', quoteCount: 3,
+      specialRequirements: 'Checkin sớm, 2 phòng họp, dinner team building bãi biển.',
+    },
+    {
+      status: 'won', priority: 'normal',
+      contactName: 'Chị Đỗ Thị Hồng', contactPhone: '0915888999', contactEmail: 'hong.dt@thpt-chuyen-hn.edu.vn', contactRole: 'Tổ trưởng Tổ chữ thập đỏ',
+      companyOrGroupName: 'Trường THPT Chuyên Hà Nội', companyTaxCode: null,
+      adultCount: 30, childCount: 0, infantCount: 0,
+      departureCity: 'Hà Nội', destination: 'Ninh Bình - Tràng An - Hạ Long', approximateDurationText: '3 ngày 2 đêm',
+      preferredStartDate: mkDate(20), hotelClassRequested: '3 sao',
+      servicesPreference: { needVisa: false, needFlight: false, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 2800000, totalBudgetVnd: 84000000,
+      assignedStaff: staff(0),
+      lastQuoteSummary: 'Đã chốt gói 3N2Đ xe 45 chỗ + KS 3 sao trung tâm = 2.800.000đ/HS', quoteCount: 2,
+      wonAt: mkDate(-2),
+    },
+    {
+      status: 'lost', priority: 'low',
+      contactName: 'Anh Nguyễn Văn Thắng', contactPhone: '0903333210', contactEmail: 'thang.nv@club-runner.vn', contactRole: 'Tổ chức sự kiện',
+      companyOrGroupName: 'Câu lạc bộ Chạy bộ Hanoi Runners', companyTaxCode: null,
+      adultCount: 35, childCount: 5, infantCount: 0,
+      departureCity: 'Hà Nội', destination: 'Mộc Châu - Sơn La', approximateDurationText: '2 ngày 1 đêm',
+      preferredStartDate: mkDate(10), hotelClassRequested: 'Resort 4 sao',
+      servicesPreference: { needVisa: false, needFlight: false, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 1800000, totalBudgetVnd: 72000000,
+      assignedStaff: staff(3),
+      lostReason: 'Khách chọn đối thủ cạnh tranh (Vietravel) giá thấp hơn 5% + tặng móc khoá',
+    },
+    {
+      status: 'new', priority: 'high',
+      contactName: 'Chị Ngô Thị Bích', contactPhone: '0902123456', contactEmail: 'bich.nt@family-vuong.vn', contactRole: null,
+      companyOrGroupName: 'Gia đình họ Võ (90 người - 3 thế hệ)', companyTaxCode: null,
+      adultCount: 60, childCount: 20, infantCount: 10,
+      departureCity: 'TP. Hồ Chí Minh', destination: 'Phú Quốc - Gành Đầu - Cảng Dứa', approximateDurationText: '4 ngày 3 đêm',
+      preferredStartDate: mkDate(60), hotelClassRequested: 'Resort 5 sao villa biển',
+      servicesPreference: { needVisa: false, needFlight: true, needBus: true, needHotel: true, needMeals: true, needGuide: true },
+      budgetPerPersonVnd: 8500000, totalBudgetVnd: 765000000,
+      assignedStaff: null,
+      specialRequirements: 'Cần 10 villa 3 phòng ngủ (3 thế hệ họ Võ), BBQ 2 tối, cần xe đẩy sân bay mỗi tòa nhà.',
+    },
+  ]
+  for (let i = 0; i < rows.length; i += 1) {
+    try {
+      const r = rows[i]
+      const created = await svc.createPublic({
+        contactName: r.contactName,
+        contactPhone: r.contactPhone,
+        contactEmail: r.contactEmail,
+        contactRole: r.contactRole,
+        companyOrGroupName: r.companyOrGroupName,
+        companyTaxCode: r.companyTaxCode,
+        adultCount: r.adultCount,
+        childCount: r.childCount,
+        infantCount: r.infantCount,
+        departureCity: r.departureCity,
+        destination: r.destination,
+        approximateDurationText: r.approximateDurationText,
+        preferredStartDate: r.preferredStartDate,
+        preferredEndDate: null,
+        hotelClassRequested: r.hotelClassRequested,
+        servicesPreference: r.servicesPreference,
+        transportRequestedNotes: null,
+        budgetPerPersonVnd: r.budgetPerPersonVnd,
+        totalBudgetVnd: r.totalBudgetVnd,
+        specialRequirements: r.specialRequirements ?? null,
+        sourceChannel: 'seed_data',
+      }, { createdByUserId: null, ip: '127.0.0.1' })
+      const patch: any = { status: r.status, priority: r.priority }
+      if (r.assignedStaff) patch.assignedStaffId = r.assignedStaff._id.toString()
+      if (r.lastQuoteSummary) patch.lastQuoteSummary = r.lastQuoteSummary
+      if (typeof r.quoteCount === 'number') patch.quoteCount = r.quoteCount
+      if (r.lostReason) patch.lostReason = r.lostReason
+      if (r.wonAt) { patch.wonAt = r.wonAt; patch.lastContactedAt = r.wonAt }
+      if (patch.status === 'quoting' || patch.status === 'negotiating' || patch.status === 'won') patch.lastContactedAt = mkDate(-1)
+      if (patch.status === 'contacted' || patch.status === 'new') patch.followUpAt = mkDate(1)
+      const sysActor = new Types.ObjectId('000000000000000000000001')
+      await svc.patch((created._id as any).toString(), patch as any, sysActor, 'admin')
+    } catch (e) {
+      // skip duplicates
+    }
+  }
+}
 
 async function seed() {
   const app = await NestFactory.createApplicationContext(AppModule)
   const users = app.get(UsersService)
   const tours = app.get(ToursService)
   const bookings = app.get(BookingsService)
+  const groupTours = app.get(GroupTourRequestsService)
 
   const email = (process.env.ADMIN_EMAIL ?? '').trim()
   const password = process.env.ADMIN_PASSWORD ?? ''
@@ -307,6 +498,9 @@ async function seed() {
       await users.createUser({ name: 'Admin', email, passwordHash, role: 'admin' })
     }
   }
+
+  const seededStaff = await seedStaff(users)
+  await seedGroupTourRequests(groupTours, seededStaff)
 
   await app.close()
 }

@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useToast } from '@/components/notifications/ToastProvider'
 import PageHeader from '@/components/ui/PageHeader'
-import { PublicTourCard, PublicTourDetail, getPublicTour, postPublicTourReview } from '@/features/tours/tours'
+import { PublicTourCard, PublicTourDetail, getPublicTour } from '@/features/tours/tours'
+import { TourReviewsSection } from '@/features/tours/TourReviewsSection'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/utils/date'
 
@@ -83,13 +84,6 @@ export default function TourDetailPage() {
   const [related, setRelated] = useState<PublicTourCard[]>([])
   const [openFaq, setOpenFaq] = useState<number>(0)
   const [tab, setTab] = useState<Tab>('program')
-  const [rvRating, setRvRating] = useState<number>(5)
-  const [rvHoverRating, setRvHoverRating] = useState<number>(0)
-  const [rvContent, setRvContent] = useState<string>('')
-  const [rvName, setRvName] = useState<string>('')
-  const [rvEmail, setRvEmail] = useState<string>('')
-  const [rvPhone, setRvPhone] = useState<string>('')
-  const [rvSubmitting, setRvSubmitting] = useState<boolean>(false)
 
   useEffect(() => {
     let alive = true
@@ -702,198 +696,15 @@ export default function TourDetailPage() {
             </section>
           ) : null}
 
-          <section className="rounded-3xl border border-slate-200 bg-slate-50/60 p-5 md:p-6 shadow-sm">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xl font-extrabold leading-tight text-slate-900">
-                  {(tour?.reviewCount ?? 0)} Đánh giá {tour?.title || ''}
-                </div>
-                {(tour?.avgRating ?? null) ? (
-                  <div className="mt-1 flex items-center gap-1.5 text-sm">
-                    <span className="flex items-center text-amber-500">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <span key={i} className={i <= Math.round(tour!.avgRating!) ? '' : 'opacity-25'}>★</span>
-                      ))}
-                    </span>
-                    <span className="font-bold text-slate-900">{tour!.avgRating!.toFixed(1)}</span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mb-6 text-sm font-bold text-slate-800">
-              Chọn đánh giá của bạn:
-              <span
-                className="ml-3 inline-flex cursor-pointer select-none items-center text-3xl text-slate-800"
-                onMouseLeave={() => setRvHoverRating(0)}
-              >
-                {[1, 2, 3, 4, 5].map((i) => {
-                  const active = (rvHoverRating || rvRating) >= i
-                  return (
-                    <span
-                      key={i}
-                      className={cn(
-                        'mr-0.5 transition-colors',
-                        active ? 'text-amber-500 drop-shadow-[0_0_2px_rgba(245,158,11,0.25)]' : 'text-slate-300',
-                      )}
-                      onClick={() => setRvRating(i)}
-                      onMouseEnter={() => setRvHoverRating(i)}
-                    >
-                      ★
-                    </span>
-                  )
-                })}
-              </span>
-            </div>
-
-            <form
-              className="grid gap-3 md:grid-cols-3"
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!slug || !tour) return
-                if (!rvName.trim()) {
-                  toast.error('Vui lòng nhập Họ tên')
-                  return
-                }
-                if (rvRating < 1 || rvRating > 5) {
-                  toast.error('Vui lòng chọn số sao')
-                  return
-                }
-                if (rvContent.length < 80) {
-                  toast.error(`Nội dung đánh giá tối thiểu 80 ký tự (hiện ${rvContent.length}/80)`)
-                  return
-                }
-                try {
-                  setRvSubmitting(true)
-                  const name = rvName.trim()
-                  const email = rvEmail.trim()
-                  const phone = rvPhone.trim()
-                  const body = {
-                    name,
-                    rating: rvRating,
-                    content: rvContent,
-                    ...(email ? { email } : {}),
-                    ...(phone ? { phone } : {}),
-                  }
-                  const res = await postPublicTourReview(slug, body)
-                  toast.success(res.message || 'Gửi đánh giá thành công!')
-                  setRvContent('')
-                  setRvName('')
-                  setRvEmail('')
-                  setRvPhone('')
-                  setRvRating(5)
-                } catch (err: any) {
-                  toast.error(err?.message || 'Gửi đánh giá không thành công')
-                } finally {
-                  setRvSubmitting(false)
-                }
-              }}
-            >
-              <div className="md:col-span-2">
-                <textarea
-                  className={cn(
-                    'w-full resize-y rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-4',
-                    rvContent.length >= 80
-                      ? 'border-emerald-200 ring-emerald-400/20 focus:ring-emerald-400/40'
-                      : 'border-slate-200 ring-orange-400/20 focus:ring-orange-400/40',
-                  )}
-                  disabled={rvSubmitting}
-                  minLength={80}
-                  onChange={(e) => setRvContent(e.target.value)}
-                  placeholder="Nhập đánh giá về tour (tối thiểu 80 ký tự)"
-                  rows={6}
-                  value={rvContent}
-                />
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-4 text-xs text-slate-600">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-semibold ring-1 ring-slate-200">
-                      <span className="text-base">📷</span>
-                      <span>Gửi ảnh</span>
-                    </span>
-                    <a className="font-semibold text-emerald-700 underline-offset-2 hover:underline" href="/quy-dinh-danh-gia" onClick={(e) => e.preventDefault()}>
-                      Quy định đăng bình luận
-                    </a>
-                  </div>
-                  <span className={cn(
-                    'rounded-full px-2.5 py-1 text-[11px] font-bold',
-                    rvContent.length >= 80 ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800',
-                  )}>
-                    {rvContent.length}/80
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid gap-3 content-start">
-                <input
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/20 focus:ring-4 focus:ring-orange-400/40"
-                  disabled={rvSubmitting}
-                  onChange={(e) => setRvName(e.target.value)}
-                  placeholder="Họ tên"
-                  value={rvName}
-                />
-                <input
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/20 focus:ring-4 focus:ring-orange-400/40"
-                  disabled={rvSubmitting}
-                  onChange={(e) => setRvEmail(e.target.value)}
-                  placeholder="Email"
-                  type="email"
-                  value={rvEmail}
-                />
-                <div className="grid grid-cols-1 gap-3">
-                  <input
-                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/20 focus:ring-4 focus:ring-orange-400/40"
-                    disabled={rvSubmitting}
-                    onChange={(e) => setRvPhone(e.target.value)}
-                    placeholder="Số điện thoại"
-                    type="tel"
-                    value={rvPhone}
-                  />
-                  <button
-                    className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-bold uppercase tracking-wide text-white shadow-md shadow-emerald-700/20 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={rvSubmitting}
-                    type="submit"
-                  >
-                    {rvSubmitting ? 'Đang gửi...' : 'Gửi đánh giá'}
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            {(tour?.reviews?.length ?? 0) > 0 ? (
-              <div className="mt-8 space-y-4 border-t border-slate-200 pt-6">
-                <div className="text-sm font-extrabold uppercase text-slate-700">Những đánh giá đã duyệt</div>
-                {tour!.reviews.map((r, idx) => (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm" key={idx}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-extrabold text-slate-900">{r.name}</div>
-                        <div className="mt-0.5 flex items-center gap-1.5">
-                          <span className="flex text-amber-500 text-sm">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                              <span key={i} className={i <= (r.rating || 0) ? '' : 'opacity-20'}>★</span>
-                            ))}
-                          </span>
-                          {r.createdAt ? (
-                            <span className="text-[11px] text-slate-500">{formatDate(r.createdAt)}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-[14px] leading-7 text-slate-700 whitespace-pre-line">{r.content}</div>
-                    {r.imageUrls?.length ? (
-                      <div className="mt-4 grid gap-2 md:grid-cols-4">
-                        {r.imageUrls.slice(0, 4).map((u) => (
-                          <div key={u} className="aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                            <img alt="Đánh giá" className="h-full w-full object-cover" src={u} />
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </section>
+          {tour ? (
+            <TourReviewsSection
+              tourId={tour.id ?? null}
+              tourSlug={slug ?? ''}
+              tourTitle={tour.title ?? ''}
+              avgRatingFromTour={tour.avgRating ?? null}
+              reviewCountFromTour={tour.reviewCount ?? 0}
+            />
+          ) : null}
         </div>
 
         <div className="space-y-4">

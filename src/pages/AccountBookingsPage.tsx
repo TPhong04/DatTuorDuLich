@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import PageHeader from '@/components/ui/PageHeader'
 import { useToast } from '@/components/notifications/ToastProvider'
 import { BookingStatus, BookingSummary, listMyBookings } from '@/features/bookings/bookings'
+import { PendingBookingReviewRow, REVIEW_STATE_META, fetchMyPendingReviewBookings } from '@/features/reviews/reviews'
 import { cn } from '@/lib/utils'
 import { formatDate, toInputDate } from '@/utils/date'
 
@@ -70,17 +71,39 @@ export default function AccountBookingsPage() {
   const [fTo, setFTo] = useState('')
   const [fQ, setFQ] = useState('')
 
+  const [pendingRows, setPendingRows] = useState<PendingBookingReviewRow[]>([])
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const loadPending = () => {
+    fetchMyPendingReviewBookings({ page: 1, pageSize: 200 })
+      .then((r) => {
+        setPendingRows(r.rows)
+        setPendingCount(r.pendingCount || 0)
+      })
+      .catch(() => {
+        setPendingRows([])
+        setPendingCount(0)
+      })
+  }
+
+  useEffect(() => {
+    loadPending()
+  }, [])
+
   const refresh = () => {
     setLoading(true)
-    listMyBookings({
-      status: fStatus || undefined,
-      from: fFrom || undefined,
-      to: fTo || undefined,
-      q: fQ || undefined,
-      page,
-      limit,
-    })
-      .then((r) => {
+    Promise.all([
+      listMyBookings({
+        status: fStatus || undefined,
+        from: fFrom || undefined,
+        to: fTo || undefined,
+        q: fQ || undefined,
+        page,
+        limit,
+      }),
+      loadPending(),
+    ])
+      .then(([r]) => {
         setItems(r.items || [])
         setTotal(r.total || 0)
         setTotalPages(r.totalPages || 1)
@@ -95,8 +118,33 @@ export default function AccountBookingsPage() {
 
   useEffect(() => { refresh() }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const stateByBookingId = useMemo(() => {
+    const map = new Map<string, PendingBookingReviewRow>()
+    for (const r of pendingRows) map.set(r.bookingId, r)
+    return map
+  }, [pendingRows])
+
   return (
     <div className="space-y-6">
+      {pendingCount > 0 ? (
+        <div className="rounded-3xl border border-orange-100 bg-gradient-to-r from-blue-50 via-white to-orange-50 p-4 md:p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 text-lg text-white shadow-sm">⭐</div>
+              <div>
+                <div className="text-sm font-extrabold text-slate-900">Bạn có <span className="bg-gradient-to-r from-blue-700 to-orange-500 bg-clip-text text-transparent">{pendingCount}</span> tour đã đi xong đang chờ bạn đánh giá!</div>
+                <div className="mt-1 text-xs text-slate-600">Viết đánh giá giúp cộng đồng lựa chọn tour tốt hơn. Mỗi bài đánh giá đều được kiểm duyệt bảo mật nghiêm ngặt.</div>
+              </div>
+            </div>
+            {pendingRows[0]?.tourSlug ? (
+              <Link to={`/tours/${encodeURIComponent(pendingRows[0].tourSlug)}#tour-reviews`} className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm hover:brightness-110">
+                ⭐ Đánh giá ngay
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <PageHeader
         subtitle="Danh sách các đơn đặt tour bạn đã tạo, bao gồm các đơn giữ chỗ, đã xác nhận và lịch sử."
         title="Đơn đặt của tôi"
@@ -154,6 +202,8 @@ export default function AccountBookingsPage() {
           items.map((b) => {
             const st = statusBadge(b.status)
             const ps = payStatusLabel(b.paymentStatus)
+            const rState = stateByBookingId.get(b.id)
+            const rMeta = rState ? REVIEW_STATE_META[rState.reviewState] : null
             return (
               <div key={b.id} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
                 <div className="grid gap-0 md:grid-cols-[180px_minmax(0,1fr)]">
@@ -166,6 +216,18 @@ export default function AccountBookingsPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-xs font-extrabold tracking-wide text-slate-500">{b.code}</span>
                           <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold', st.cls)}>{st.label}</span>
+                          {rMeta ? (
+                            <span
+                              title={rMeta.label}
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold',
+                                rMeta.chip,
+                              )}
+                            >
+                              <span>{rMeta.icon}</span>
+                              {rMeta.label}
+                            </span>
+                          ) : null}
                         </div>
                         <Link to={b.tour.slug ? `/tours/${b.tour.slug}` : '/tours'} className="mt-1.5 line-clamp-2 text-base font-extrabold text-slate-900 hover:text-orange-600">{b.tour.title}</Link>
                         <div className="mt-1 text-xs text-slate-500">Ngày đặt: <span className="font-semibold text-slate-700">{formatDate(b.createdAt) || '-'}</span></div>
@@ -177,15 +239,15 @@ export default function AccountBookingsPage() {
                     </div>
                     <div className="grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-xs md:grid-cols-2">
                       <div className="flex items-start gap-2">
-                        <span className="text-slate-400 shrink-0 w-20">Ngày đi</span>
+                        <span className="shrink-0 w-20 text-slate-400">Ngày đi</span>
                         <span className="font-semibold text-slate-800">{formatDate(b.departureDate) || '-'}</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <span className="text-slate-400 shrink-0 w-20">Tiêu chuẩn</span>
-                        <span className="font-semibold text-slate-800 line-clamp-1">{b.departureStandardText || '-'}</span>
+                        <span className="shrink-0 w-20 text-slate-400">Tiêu chuẩn</span>
+                        <span className="line-clamp-1 font-semibold text-slate-800">{b.departureStandardText || '-'}</span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <span className="text-slate-400 shrink-0 w-20">Hành khách</span>
+                        <span className="shrink-0 w-20 text-slate-400">Hành khách</span>
                         <span className="font-semibold text-slate-800">
                           {b.adultCount ? `NL ${b.adultCount}` : ''}
                           {b.adultCount && (b.childCount || b.infantCount) ? ' · ' : ''}
@@ -195,7 +257,7 @@ export default function AccountBookingsPage() {
                         </span>
                       </div>
                       <div className="flex items-start gap-2">
-                        <span className="text-slate-400 shrink-0 w-20">Thanh toán</span>
+                        <span className="shrink-0 w-20 text-slate-400">Thanh toán</span>
                         <span className="font-semibold text-slate-800">{payLabel(b.paymentMethod)} · <span className={ps.c}>{ps.t}</span></span>
                       </div>
                     </div>
@@ -206,8 +268,16 @@ export default function AccountBookingsPage() {
                         {b.status === 'in_progress' ? '🚌 Tour đang diễn ra, chúc quý khách có chuyến đi vui vẻ!' : ''}
                         {b.status === 'completed' ? '✅ Tour đã hoàn thành. Cảm ơn bạn đã đồng hành!' : ''}
                         {b.status === 'cancelled' ? '❌ Đơn đã được hủy. Nếu có câu hỏi vui lòng liên hệ tổng đài.' : ''}
+                        {rState?.canReview === true && b.tour.slug ? (
+                          <span className="ml-1 rounded bg-orange-50 px-2 py-0.5 font-bold not-italic text-orange-700 ring-1 ring-orange-200">⏳ Hạn viết đánh giá đến {rState.reviewWindowEnd ? formatDate(rState.reviewWindowEnd) : ''}</span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
+                        {rState?.canReview === true && b.tour.slug ? (
+                          <Link to={`/tours/${b.tour.slug}#tour-reviews`} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-4 text-xs font-extrabold uppercase text-white shadow-sm hover:brightness-110">
+                            ⭐ Đánh giá
+                          </Link>
+                        ) : null}
                         {b.tour.slug ? (
                           <Link to={`/tours/${b.tour.slug}`} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">Xem tour</Link>
                         ) : null}

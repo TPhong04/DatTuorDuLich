@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useToast } from '@/components/notifications/ToastProvider'
 import PageHeader from '@/components/ui/PageHeader'
 import { fetchProfile, getStoredUser, isAuthed, logout } from '@/features/auth/auth'
+import { fetchMyPendingReviewBookings } from '@/features/reviews/reviews'
 
 export default function AccountPage() {
   const authed = isAuthed()
@@ -12,22 +13,32 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
+  const [pendingCount, setPendingCount] = useState(0)
+  const [firstPendingSlug, setFirstPendingSlug] = useState<string | null>(null)
+
   if (!authed) return <Navigate replace to="/auth/login" />
 
   const initials = (profile?.name?.trim()?.[0] ?? 'U').toUpperCase()
 
   useEffect(() => {
     let alive = true
-    fetchProfile()
-      .then((u) => {
-        if (!alive || !u) return
-        setProfile(u)
-      })
-      .catch(() => null)
-      .finally(() => {
-        if (!alive) return
-        setLoading(false)
-      })
+    Promise.all([
+      fetchProfile()
+        .then((u) => {
+          if (!alive || !u) return
+          setProfile(u)
+        })
+        .catch(() => null),
+      fetchMyPendingReviewBookings({ page: 1, pageSize: 50 })
+        .then((r) => {
+          if (!alive) return
+          setPendingCount(r.pendingCount || 0)
+          setFirstPendingSlug(r.rows[0]?.tourSlug || null)
+        })
+        .catch(() => null),
+    ]).finally(() => {
+      if (alive) setLoading(false)
+    })
     return () => {
       alive = false
     }
@@ -41,6 +52,32 @@ export default function AccountPage() {
 
   return (
     <div className="space-y-6">
+      {pendingCount > 0 ? (
+        <div className="rounded-3xl border border-orange-100 bg-gradient-to-r from-blue-50 via-white to-orange-50 p-4 md:p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 text-lg text-white shadow-sm">⭐</div>
+              <div>
+                <div className="text-sm font-extrabold text-slate-900">
+                  Bạn có <span className="bg-gradient-to-r from-blue-700 to-orange-500 bg-clip-text text-transparent">{pendingCount}</span> tour đã đi xong đang chờ đánh giá!
+                </div>
+                <div className="mt-1 text-xs text-slate-600">Viết đánh giá giúp cộng đồng lựa chọn tour tốt hơn. Mỗi bài đánh giá được bảo mật nghiêm ngặt và chỉ sửa được trong 7 ngày đầu.</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link to="/account/bookings" className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">
+                Xem danh sách
+              </Link>
+              {firstPendingSlug ? (
+                <Link to={`/tours/${encodeURIComponent(firstPendingSlug)}#tour-reviews`} className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm hover:brightness-110">
+                  ⭐ Đánh giá ngay
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <PageHeader subtitle="Quản lý thông tin cá nhân, booking và hóa đơn." title="Tài khoản" />
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
