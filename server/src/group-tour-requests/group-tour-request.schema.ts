@@ -119,11 +119,17 @@ export class GroupTourRequest {
   @Prop({ type: String, default: null, trim: true })
   lostReason!: string | null
 
+  @Prop({ type: Date, default: null, index: true })
+  lostAt!: Date | null
+
   @Prop({ type: String, default: null, trim: true })
   internalStaffNote!: string | null
 
   @Prop({ type: Types.ObjectId, default: null, index: true, ref: 'User' })
   createdByUserId!: Types.ObjectId | null
+
+  @Prop({ type: Types.ObjectId, default: null, index: true, ref: 'User' })
+  updatedByStaffId!: Types.ObjectId | null
 
   @Prop({ type: String, default: null, trim: true })
   sourceChannel!: string | null
@@ -139,5 +145,5 @@ export const GroupTourRequestSchema = SchemaFactory.createForClass(GroupTourRequ
 GroupTourRequestSchema.index({ status: 1, createdAt: -1 })
 GroupTourRequestSchema.index({ priority: 1, status: 1 })
 GroupTourRequestSchema.index({ assignedStaffId: 1, status: 1 })
-GroupTourRequestSchema.index({ contactPhone: 1 })
 GroupTourRequestSchema.index({ preferredStartDate: 1 })
+GroupTourRequestSchema.index({ wonAt: 1 })

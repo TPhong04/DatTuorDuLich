@@ -64,10 +64,7 @@ const STATUS_META: Array<{ key: Booking['status']; label: string; color: string 
   { key: 'cancelled', label: 'Đã hủy', color: '#f43f5e' },
 ]
 
-const TOUR_TYPE_META: Array<{ predicate: (t: TourDocument | null, tourCode: string | null, title: string) => boolean; label: string; color: string }> = [
-  { predicate: (t, code, title) => /ngoài\s?nước|quốc\s?tế|campuchia|thái\s?lan|hàn\s?quốc|nhật\s?bản|china|trung\s?quốc|siam|laos|myanmar|singapore|malaysia/i.test(title) || /intl|external|nx|nt/i.test(code || ''), label: 'Nước ngoài', color: '#f97316' },
-  { predicate: (t, code, title) => /đoàn|mice|công\s?ty|doanh\s?nghiệp|sự\s?kiện|team\s?building/i.test(title) || /tour\s?xe|xe\s?khách|limo|bus/i.test(title) || (!!t && t.type === 'group'), label: 'Tour xe / Đoàn riêng', color: '#0ea5e9' },
-]
+const TOUR_TYPE_META: Array<{ predicate: (t: TourDocument | null, tourCode: string | null, title: string) => boolean; label: string; color: string }> = []
 
 const TOP_TONES = [
   'bg-gradient-to-br from-blue-500 to-orange-500',
@@ -122,14 +119,26 @@ export class DashboardsService {
       return d
     })
 
-    const scopeQuery: Record<string, unknown> = opts?.scopeToOwner && userId ? { createdBy: userId } : {}
+    const userOid = userId ?? null
+    let scopeQuery: Record<string, unknown> = {}
+    if (opts?.scopeToOwner && userOid) {
+      const ors: Record<string, unknown>[] = []
+      ors.push({ createdBy: userOid })
+      ors.push({ assignedStaffIds: { $elemMatch: { $eq: userOid } } })
+      ors.push({ updatedByStaffId: userOid })
+      scopeQuery = { $or: ors }
+    }
+
+    const allProj = [
+      'code', 'status', 'paymentStatus', 'totalAmount', 'adultCount', 'childCount', 'infantCount',
+      'departureDate', 'departureStandardText', 'createdAt', 'tourId', 'tourSnapshot', 'contact',
+      'assignedStaffIds', 'updatedByStaffId', 'createdBy',
+    ] as const
 
     const [allBookings, toursAll] = await Promise.all([
       this.bookingModel
         .find({ ...scopeQuery })
-        .select(
-          'code status paymentStatus totalAmount adultCount childCount infantCount departureDate departureStandardText createdAt tourId tourSnapshot contact',
-        )
+        .select(allProj.join(' '))
         .sort({ createdAt: -1 })
         .limit(500)
         .lean(),
@@ -195,10 +204,7 @@ export class DashboardsService {
       return { label, value, color: color || '#94a3b8' }
     })
     if (tourTypeSlices.length === 0) {
-      tourTypeSlices.push({ label: 'Trong nước', value: Math.max(1, kpis.bookingCount), color: '#2563eb' })
-    }
-    if (statusSlices.length === 0) {
-      statusSlices.push({ label: 'Mới tạo', value: 1, color: '#8b5cf6' })
+      tourTypeSlices.push({ label: 'Trong nước', value: kpis.bookingCount, color: '#2563eb' })
     }
 
     const line7Days: AdminLinePoint[] = days.map((d) => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import PageHeader from '@/components/ui/PageHeader'
 import { useToast } from '@/components/notifications/ToastProvider'
@@ -10,6 +10,7 @@ import {
   adminListBookings,
   adminUpdateBookingStatus,
 } from '@/features/bookings/bookings'
+import { adminListUsers, AdminUser } from '@/features/admin/admin'
 import { cn } from '@/lib/utils'
 import { formatDate, formatDateTime, toInputDate } from '@/utils/date'
 
@@ -63,6 +64,7 @@ function passengerTypeColor(t: string) {
 
 export default function AdminBookingsPage() {
   const toast = useToast()
+  const [sp] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<Booking[]>([])
   const [total, setTotal] = useState(0)
@@ -81,6 +83,10 @@ export default function AdminBookingsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [adminNote, setAdminNote] = useState('')
   const [sendingAction, setSendingAction] = useState<null | 'confirm' | 'cancel' | 'note'>(null)
+  const [staffList, setStaffList] = useState<AdminUser[]>([])
+  const [staffListLoading, setStaffListLoading] = useState(false)
+  const [assignStaffId, setAssignStaffId] = useState<string>('')
+  const [assigningStaff, setAssigningStaff] = useState(false)
 
   const stats = useMemo(() => {
     const byStatus: Record<string, number> = {}
@@ -98,8 +104,66 @@ export default function AdminBookingsPage() {
       .finally(() => setLoading(false))
   }
 
+  const fetchStaffListOnce = async () => {
+    if (staffList.length) return
+    setStaffListLoading(true)
+    try {
+      const r = await adminListUsers({ role: 'staff', isActive: true, page: 1, limit: 200 })
+      const list = r.items || []
+      setStaffList(list)
+      if (list.length === 1) setAssignStaffId(String(list[0].id))
+    } catch (e) {
+      console.warn('[admin:bookings] fetchStaffListOnce failed:', e)
+      try {
+        const r2 = await adminListUsers({ role: 'staff', isActive: true, page: 1, limit: 100 })
+        const list = r2.items || []
+        setStaffList(list)
+        if (list.length === 1) setAssignStaffId(String(list[0].id))
+      } catch {
+        setStaffList([])
+      }
+    } finally {
+      setStaffListLoading(false)
+    }
+  }
+  useEffect(() => { if (modalOpen) fetchStaffListOnce() }, [modalOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAssignStaff = async () => {
+    if (!assignStaffId || !detail) { toast.warning('Vui lòng chọn nhân viên cần giao việc.'); return }
+    const staff = staffList.find((x) => String(x.id) === String(assignStaffId))
+    if (!staff) return
+    setAssigningStaff(true)
+    try {
+      const stamp = new Date().toLocaleString('vi-VN')
+      const line = `【${stamp}】✅ Giao việc xử lý đơn cho nhân viên: ${staff.name} (${staff.email}${staff.phone ? ' · ' + staff.phone : ''}) — ID #${staff.id}`
+      setAdminNote((prev) => (prev ? `${prev}\n${line}` : line))
+      toast.success(`Đã ghi nhận giao đơn ${detail.code} cho nhân viên ${staff.name}. (Thông tin tạm lưu vào Ghi chú nội bộ — API Assign Staff sẽ được BE bật chính thức sau)`)
+    } finally {
+      setTimeout(() => setAssigningStaff(false), 500)
+    }
+  }
+
   useEffect(() => { setPage(1) }, [fStatus, fFrom, fTo, fQ])
-  useEffect(() => { refresh() }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refresh() }, [page, fStatus, fFrom, fTo, fQ]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const id = sp.get('id')
+    if (id) {
+      const tryOpen = () => {
+        const found = items.find((x) => x.id === id || x.code === id)
+        if (found) {
+          void openDetail(found.id)
+          return true
+        }
+        return false
+      }
+      if (!tryOpen()) {
+        // Nếu list chưa chứa đơn (page khác / mới tạo) -> mở detail trực tiếp + refresh list để nó xuất hiện
+        void openDetail(id)
+        refresh()
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp.get('id')])
 
   const openDetail = async (id: string) => {
     setSelectedId(id)
@@ -140,7 +204,7 @@ export default function AdminBookingsPage() {
         title="Quản lý Đơn đặt"
         right={
           <div className="flex items-center gap-2">
-            <button onClick={refresh} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 text-xs font-extrabold uppercase text-slate-700 shadow-sm hover:bg-slate-50">⟳ Tải lại</button>
+            <button onClick={refresh} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-extrabold uppercase text-slate-700 shadow-sm hover:bg-slate-50">⟳ Tải lại</button>
           </div>
         }
       />
@@ -192,8 +256,8 @@ export default function AdminBookingsPage() {
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</label>
               <input value={fQ} onChange={(e) => setFQ(e.target.value)} placeholder="Mã / Tour / Tên KH / SĐT / Email" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-blue-100 focus:border-orange-400 focus:ring-4" />
             </div>
-            <button type="button" onClick={refresh} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-orange-500 px-5 text-sm font-extrabold uppercase text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600">Tìm</button>
-            <button type="button" onClick={() => { setFStatus(''); setFFrom(''); setFTo(''); setFQ(''); setPage(1) }} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-5 text-sm font-extrabold uppercase text-slate-700 hover:bg-slate-50">Reset</button>
+            <button type="button" onClick={refresh} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600">Tìm</button>
+            <button type="button" onClick={() => { setFStatus(''); setFFrom(''); setFTo(''); setFQ(''); setPage(1) }} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-5 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">Reset</button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -203,79 +267,91 @@ export default function AdminBookingsPage() {
 
       <div className="overflow-hidden rounded-3xl bg-white shadow-lg shadow-blue-900/5 ring-1 ring-blue-100">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm">
+          <table className="min-w-full w-full border-collapse text-left text-sm">
+            <colgroup>
+              <col style={{ minWidth: 220 }} />
+              <col style={{ minWidth: 420 }} />
+              <col style={{ minWidth: 180 }} />
+              <col style={{ minWidth: 260 }} />
+              <col style={{ minWidth: 200 }} />
+              <col style={{ minWidth: 170 }} />
+              <col style={{ minWidth: 190 }} />
+              <col style={{ minWidth: 330 }} />
+            </colgroup>
             <thead>
-              <tr className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-xs uppercase tracking-wide text-white">
-                <th className="px-5 py-4 font-black">Mã đặt</th>
-                <th className="px-5 py-4 font-black">Tour / Ngày đi</th>
-                <th className="px-5 py-4 font-black">Khách</th>
-                <th className="px-5 py-4 font-black">Liên hệ</th>
-                <th className="px-5 py-4 font-black">TT</th>
-                <th className="px-5 py-4 font-black">Tổng tiền</th>
-                <th className="px-5 py-4 font-black">Tạo lúc</th>
-                <th className="px-5 py-4 font-black text-right pr-5">Thao tác</th>
+              <tr className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-[11px] 2xl:text-xs uppercase tracking-wider text-white">
+                <th className="px-6 py-4 font-black">Mã đặt</th>
+                <th className="px-6 py-4 font-black">Tour / Ngày đi</th>
+                <th className="px-6 py-4 font-black">Khách</th>
+                <th className="px-6 py-4 font-black">Liên hệ</th>
+                <th className="px-6 py-4 font-black">Thanh toán</th>
+                <th className="px-6 py-4 font-black">Tổng tiền</th>
+                <th className="px-6 py-4 font-black">Tạo lúc</th>
+                <th className="px-6 py-4 font-black text-right pr-6">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {loading && !items.length ? (
-                <tr><td colSpan={8} className="px-5 py-14 text-center text-sm text-slate-400">Đang tải danh sách bookings...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-400">Đang tải danh sách bookings...</td></tr>
               ) : !items.length ? (
-                <tr><td colSpan={8} className="px-5 py-14 text-center text-sm text-slate-400">Chưa có booking nào khớp với điều kiện lọc.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-14 text-center text-sm text-slate-400">Chưa có booking nào khớp với điều kiện lọc.</td></tr>
               ) : (
                 items.map((b, idx) => {
                   const st = statusBadge(b.status)
                   const ps = payStatus(b.paymentStatus)
                   return (
                     <tr key={b.id} className={cn(idx % 2 ? 'bg-slate-50/40' : 'bg-white', 'hover:bg-blue-50/40 border-t border-slate-100 transition')}>
-                      <td className="px-5 py-4 align-middle">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className={cn('h-2 w-2 rounded-full', st.dot)} />
-                            <span className="font-mono text-sm font-black text-slate-900">{b.code}</span>
+                      <td className="px-6 py-5 align-middle">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <span className={cn('h-2.5 w-2.5 rounded-full shadow-inner', st.dot)} />
+                            <span className="font-mono text-sm 2xl:text-[15px] font-black text-slate-900">{b.code}</span>
                           </div>
-                          <span className={cn('inline-flex self-start rounded-full px-2.5 py-0.5 text-[11px] font-bold', st.cls)}>{st.label}</span>
+                          <span className={cn('inline-flex self-start whitespace-nowrap items-center rounded-full px-3 py-1.5 text-xs font-bold ring-1', st.cls)}>{st.label}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-6 py-5 align-middle">
                         {b.tour?.slug ? (
-                          <Link target="_blank" to={`/tours/${b.tour.slug}`} className="line-clamp-1 font-bold text-slate-900 hover:text-orange-600">{b.tour.title}</Link>
-                        ) : <div className="line-clamp-1 font-bold text-slate-900">{b.tour?.title || '-'}</div>}
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <Link target="_blank" to={`/tours/${b.tour.slug}`} className="line-clamp-1 font-bold text-slate-900 text-[15px] 2xl:text-base hover:text-orange-600">{b.tour.title}</Link>
+                        ) : <div className="line-clamp-1 font-bold text-slate-900 text-[15px] 2xl:text-base">{b.tour?.title || '-'}</div>}
+                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs 2xl:text-[13px] text-slate-500">
                           <span>📅 {formatDate(b.departureDate) || '-'}</span>
                           {b.departureStandardText ? <span className="line-clamp-1">⭐ {b.departureStandardText}</span> : null}
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-middle">
-                        <div className="text-xs font-semibold text-slate-700">
-                          {b.adultCount ? <span className="inline-flex items-center gap-1"><span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-blue-50 px-1.5 font-bold text-blue-700">NL {b.adultCount}</span></span> : ''}
-                          {b.childCount ? <span className="ml-1.5 inline-flex items-center gap-1"><span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-violet-50 px-1.5 font-bold text-violet-700">TE {b.childCount}</span></span> : ''}
-                          {b.infantCount ? <span className="ml-1.5 inline-flex items-center gap-1"><span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-pink-50 px-1.5 font-bold text-pink-700">EB {b.infantCount}</span></span> : ''}
+                      <td className="px-6 py-5 align-middle">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {b.adultCount ? <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 ring-1 ring-blue-100 font-bold text-blue-700 text-xs 2xl:text-[13px]">NL {b.adultCount}</span> : null}
+                          {b.childCount ? <span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1 ring-1 ring-violet-100 font-bold text-violet-700 text-xs 2xl:text-[13px]">TE {b.childCount}</span> : null}
+                          {b.infantCount ? <span className="inline-flex items-center gap-1 rounded-lg bg-pink-50 px-2.5 py-1 ring-1 ring-pink-100 font-bold text-pink-700 text-xs 2xl:text-[13px]">EB {b.infantCount}</span> : null}
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-middle">
-                        <div className="font-bold text-slate-900">{b.contact?.name || '-'}</div>
-                        <div className="text-xs text-slate-600">📞 {b.contact?.phone || '-'}</div>
-                        {b.contact?.email ? <div className="text-xs text-slate-500">✉ {b.contact.email}</div> : null}
+                      <td className="px-6 py-5 align-middle">
+                        <div className="font-bold text-slate-900 text-[15px] 2xl:text-base">{b.contact?.name || '-'}</div>
+                        <div className="text-xs 2xl:text-[13px] text-slate-600 mt-0.5">📞 {b.contact?.phone || '-'}</div>
+                        {b.contact?.email ? <div className="text-xs text-slate-500 mt-0.5">✉ {b.contact.email}</div> : null}
                       </td>
-                      <td className="px-5 py-4 align-middle">
-                        <div className="text-xs font-bold text-slate-700">{payLabel(b.paymentMethod)}</div>
-                        <div className={cn('text-xs font-semibold', ps.c)}>{ps.t}</div>
+                      <td className="px-6 py-5 align-middle">
+                        <div className="flex flex-col gap-2">
+                          <span className="inline-flex whitespace-nowrap self-start items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs 2xl:text-[13px] font-bold text-slate-700 ring-1 ring-slate-200">{payLabel(b.paymentMethod)}</span>
+                          <span className={cn('inline-flex whitespace-nowrap self-start items-center rounded-full px-3 py-1.5 text-xs 2xl:text-[13px] font-bold ring-1', ps.c)}>{ps.t}</span>
+                        </div>
                       </td>
-                      <td className="px-5 py-4 align-middle">
-                        <div className="text-lg font-black text-orange-600">{formatMoney(b.totalAmount)}</div>
+                      <td className="px-6 py-5 align-middle">
+                        <div className="text-[17px] 2xl:text-xl font-black text-orange-600 tabular-nums">{formatMoney(b.totalAmount)}</div>
                       </td>
-                      <td className="px-5 py-4 align-middle text-xs text-slate-600">
+                      <td className="px-6 py-5 align-middle text-xs 2xl:text-[13px] text-slate-600 whitespace-nowrap">
                         {formatDateTime(b.createdAt) || '-'}
                       </td>
-                      <td className="px-5 py-4 align-middle text-right pr-5">
+                      <td className="px-6 py-5 align-middle text-right pr-6">
                         <div className="inline-flex items-center gap-2">
                           {canConfirm(b) ? (
-                            <button type="button" onClick={async () => { try { setSendingAction('confirm'); await adminUpdateBookingStatus(b.id, { status: 'confirmed', adminNote: null }); toast.success(`Đã xác nhận đơn ${b.code}.`); refresh() } catch (e) { toast.error((e as Error)?.message || 'Lỗi') } finally { setSendingAction(null) } }} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-emerald-600 px-3.5 text-xs font-extrabold uppercase text-white shadow-sm shadow-emerald-700/20 hover:bg-emerald-700">✓ XN</button>
+                            <button type="button" onClick={async () => { try { setSendingAction('confirm'); await adminUpdateBookingStatus(b.id, { status: 'confirmed', adminNote: null }); toast.success(`Đã xác nhận đơn ${b.code}.`); refresh() } catch (e) { toast.error((e as Error)?.message || 'Lỗi') } finally { setSendingAction(null) } }} className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-emerald-600 px-4 text-[10px] 2xl:text-[11px] font-extrabold uppercase text-white shadow-sm shadow-emerald-700/20 hover:bg-emerald-700">✓ XN</button>
                           ) : null}
                           {canCancel(b) ? (
-                            <button type="button" onClick={async () => { try { setSendingAction('cancel'); await adminUpdateBookingStatus(b.id, { status: 'cancelled', adminNote: 'Hủy từ list admin', sendBackSeatsOnCancel: true }); toast.success(`Đã hủy đơn ${b.code} & trả chỗ.`); refresh() } catch (e) { toast.error((e as Error)?.message || 'Lỗi') } finally { setSendingAction(null) } }} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-rose-600 px-3.5 text-xs font-extrabold uppercase text-white shadow-sm shadow-rose-700/20 hover:bg-rose-700">✕ Hủy</button>
+                            <button type="button" onClick={async () => { try { setSendingAction('cancel'); await adminUpdateBookingStatus(b.id, { status: 'cancelled', adminNote: 'Hủy từ list admin', sendBackSeatsOnCancel: true }); toast.success(`Đã hủy đơn ${b.code} & trả chỗ.`); refresh() } catch (e) { toast.error((e as Error)?.message || 'Lỗi') } finally { setSendingAction(null) } }} className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-rose-600 px-4 text-[10px] 2xl:text-[11px] font-extrabold uppercase text-white shadow-sm shadow-rose-700/20 hover:bg-rose-700">✕ Hủy</button>
                           ) : null}
-                          <button type="button" onClick={() => openDetail(b.id)} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">Chi tiết</button>
+                          <button type="button" onClick={() => openDetail(b.id)} className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-[10px] 2xl:text-[11px] font-extrabold uppercase text-slate-700 hover:bg-slate-50">Chi tiết</button>
                         </div>
                       </td>
                     </tr>
@@ -286,10 +362,10 @@ export default function AdminBookingsPage() {
           </table>
         </div>
         {totalPages > 1 ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4">
-            <div className="text-xs text-slate-500">Trang <b className="text-slate-800">{page}</b> / {totalPages} · tổng {total} đơn.</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-5">
+            <div className="text-xs 2xl:text-[13px] text-slate-500">Trang <b className="text-slate-800">{page}</b> / {totalPages} · tổng {total} đơn.</div>
             <div className="flex items-center gap-2">
-              <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">‹</button>
+              <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">‹</button>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 let pn = i + 1
                 if (totalPages > 5) {
@@ -297,10 +373,10 @@ export default function AdminBookingsPage() {
                   pn = start + i
                 }
                 return (
-                  <button key={pn} onClick={() => setPage(pn)} className={cn('inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-xl px-3 text-sm font-bold', page === pn ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/20' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}>{pn}</button>
+                  <button key={pn} onClick={() => setPage(pn)} className={cn('inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-xl px-3.5 text-xs font-bold', page === pn ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/20' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}>{pn}</button>
                 )
               })}
-              <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">›</button>
+              <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40">›</button>
             </div>
           </div>
         ) : null}
@@ -323,6 +399,56 @@ export default function AdminBookingsPage() {
                 ) : <div className="mt-1 text-lg">Đang tải...</div>}
               </div>
               <button type="button" onClick={() => setModalOpen(false)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20">✕</button>
+            </div>
+            <div className="sticky top-0 z-20 border-b border-orange-100 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 px-6 py-4 shadow-[0_4px_20px_-8px_rgba(249,115,22,0.25)]">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="mr-auto flex items-center gap-2">
+                  <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-orange-500 px-3 text-[11px] font-black uppercase tracking-wider text-white ring-1 ring-orange-600/40 shadow-sm shadow-orange-500/20">⚡ HÀNH ĐỘNG</span>
+                  <span className="text-xs font-semibold text-orange-900/80">Admin xử lý nhanh đơn hàng khi bấm vào thông báo — 2 lựa chọn chính:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {detail && canConfirm(detail) ? (
+                    <button
+                      type="button"
+                      onClick={() => patchStatus('confirmed')}
+                      disabled={!!sendingAction}
+                      className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500 px-5 text-[10px] font-black uppercase tracking-wide text-white shadow-lg shadow-emerald-600/30 ring-1 ring-white/60 transition hover:brightness-110 disabled:opacity-60"
+                    >
+                      <span className="text-base leading-none">✓</span>
+                      1. XỬ LÝ ĐƠN (Xác nhận)
+                    </button>
+                  ) : (
+                    <div className="inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-slate-100 px-4 text-[10px] font-bold uppercase text-slate-500 ring-1 ring-slate-200">
+                      <span>✓ Đơn đã xử lý / không cần xác nhận lại</span>
+                    </div>
+                  )}
+                  <div className="flex items-stretch gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-orange-200/70">
+                    <div className="flex items-center pl-1 pr-2">
+                      <select
+                        value={assignStaffId}
+                        onChange={(e) => setAssignStaffId(e.target.value)}
+                        disabled={staffListLoading || assigningStaff}
+                        className="h-9 min-w-[220px] appearance-none rounded-xl border-0 bg-transparent px-2 text-xs font-semibold text-slate-800 outline-none focus:ring-0 disabled:opacity-60"
+                        title="Chọn nhân viên cần giao đơn"
+                      >
+                        <option value="">(1) Chọn nhân viên →</option>
+                        {staffList.map((u) => (
+                          <option key={u.id} value={String(u.id)}>{u.name || u.email} {u.phone ? `· ${u.phone}` : ''} ({u.email})</option>
+                        ))}
+                        {staffList.length === 0 && !staffListLoading ? <option disabled>— Chưa có nhân viên staff hoạt động —</option> : null}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!assignStaffId || assigningStaff || staffListLoading}
+                      onClick={() => void handleAssignStaff()}
+                      className="inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600 px-4 text-[10px] font-black uppercase tracking-wide text-white shadow-sm shadow-indigo-700/20 ring-1 ring-white/50 transition hover:brightness-110 disabled:opacity-60"
+                    >
+                      {assigningStaff ? 'Đang lưu...' : '2. GIAO CHO NHÂN VIÊN'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {detailLoading || !detail ? (
@@ -454,12 +580,12 @@ export default function AdminBookingsPage() {
                 {sendingAction ? <span className="inline-flex items-center gap-2 text-blue-700 font-bold"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"></span>Đang xử lý...</span> : 'Đơn vị VNĐ, giá đã bao gồm VAT theo quy định.'}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => setModalOpen(false)} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-5 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">Đóng</button>
+                <button type="button" onClick={() => setModalOpen(false)} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-extrabold uppercase text-slate-700 hover:bg-slate-50">Đóng</button>
                 {detail && canCancel(detail) ? (
-                  <button type="button" disabled={!!sendingAction} onClick={() => patchStatus('cancelled', true)} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-rose-600 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-rose-700/20 hover:bg-rose-700 disabled:opacity-60">✕ Hủy đơn (trả chỗ)</button>
+                  <button type="button" disabled={!!sendingAction} onClick={() => patchStatus('cancelled', true)} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-rose-600 px-5 text-[10px] font-extrabold uppercase text-white shadow-sm shadow-rose-700/20 hover:bg-rose-700 disabled:opacity-60">✕ Hủy đơn (trả chỗ)</button>
                 ) : null}
                 {detail && canConfirm(detail) ? (
-                  <button type="button" disabled={!!sendingAction} onClick={() => patchStatus('confirmed')} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-emerald-700 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-emerald-800/20 hover:bg-emerald-800 disabled:opacity-60">✓ Xác nhận đơn</button>
+                  <button type="button" disabled={!!sendingAction} onClick={() => patchStatus('confirmed')} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-emerald-700 px-5 text-[10px] font-extrabold uppercase text-white shadow-sm shadow-emerald-800/20 hover:bg-emerald-800 disabled:opacity-60">✓ Xác nhận đơn</button>
                 ) : null}
               </div>
             </div>

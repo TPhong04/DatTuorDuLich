@@ -1,7 +1,8 @@
 import { ReactNode, useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
+  Bell,
   BookOpen,
   CalendarDays,
   ClipboardList,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 
 import logo from '@/assets/logo.png'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import { getStoredUser, logout } from '@/features/auth/auth'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +36,8 @@ const navLinkClassName = ({ isActive }: { isActive: boolean }) =>
 
 export default function AdminShell() {
   const [, setAuthVersion] = useState(0)
+  const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     const onAuthChanged = () => setAuthVersion((v) => v + 1)
@@ -43,10 +47,24 @@ export default function AdminShell() {
 
   const user = getStoredUser()
 
+  useEffect(() => {
+    if (!user) return
+    if (user.role === 'staff') {
+      navigate('/staff', { replace: true })
+      return
+    }
+    if (user.role !== 'admin') {
+      navigate('/', { replace: true })
+    }
+  }, [user, navigate])
+
   const groups: NavGroup[] = [
     {
       label: 'Tổng quan',
-      items: [{ label: 'Dashboard', to: '/admin', icon: <LayoutDashboard className="h-4 w-4" />, end: true }],
+      items: [
+        { label: 'Dashboard', to: '/admin', icon: <LayoutDashboard className="h-4 w-4" />, end: true },
+        { label: 'Thông báo', to: '/admin/notifications', icon: <Bell className="h-4 w-4" /> },
+      ],
     },
     {
       label: 'Sản phẩm',
@@ -143,6 +161,15 @@ export default function AdminShell() {
         </aside>
 
         <main className="min-w-0">
+          <div className="sticky top-3 z-40 mb-4 flex items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm backdrop-blur lg:px-6">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Hệ thống quản trị</div>
+              <div className="truncate text-sm font-bold text-slate-800">Xin chào, {user?.name ?? 'Admin'} 👋</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+            </div>
+          </div>
           <Outlet />
         </main>
       </div>

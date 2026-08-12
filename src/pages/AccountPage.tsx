@@ -65,11 +65,11 @@ export default function AccountPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link to="/account/bookings" className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">
+              <Link to="/account/bookings" className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-extrabold uppercase text-slate-700 hover:bg-slate-50">
                 Xem danh sách
               </Link>
               {firstPendingSlug ? (
-                <Link to={`/tours/${encodeURIComponent(firstPendingSlug)}#tour-reviews`} className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm hover:brightness-110">
+                <Link to={`/tours/${encodeURIComponent(firstPendingSlug)}#tour-reviews`} className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-[10px] font-extrabold uppercase text-white shadow-sm hover:brightness-110">
                   ⭐ Đánh giá ngay
                 </Link>
               ) : null}
@@ -169,14 +169,14 @@ export default function AccountPage() {
 
             <div className="grid grid-cols-2 gap-2 pt-2">
               <button
-                className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+                className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-orange-500 text-xs font-semibold text-white transition hover:bg-orange-600"
                 onClick={() => navigate('/account/edit')}
                 type="button"
               >
                 Chỉnh sửa
               </button>
               <button
-                className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
                 onClick={onLogout}
                 type="button"
               >
@@ -186,12 +186,12 @@ export default function AccountPage() {
           </div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-sm font-semibold text-slate-900">Booking</div>
+          <div className="text-sm font-semibold text-slate-900">Thông báo của tôi</div>
           <div className="mt-2 text-sm text-slate-600">
-            Xem lịch sử booking, trạng thái xác nhận, thanh toán mô phỏng.
+            Xem lịch sử cập nhật booking, báo giá, chốt đơn, nhắc lịch khởi hành.
           </div>
-          <Link className="mt-4 inline-flex text-sm font-semibold text-blue-800 hover:underline" to="/account/bookings">
-            Đi tới booking của tôi
+          <Link className="mt-4 inline-flex text-sm font-semibold text-blue-800 hover:underline" to="/account/notifications">
+            Đi tới thông báo của tôi →
           </Link>
         </div>
       </div>

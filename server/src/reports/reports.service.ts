@@ -195,28 +195,7 @@ const TOUR_TYPE_META: Array<{
   predicate: (t: TourDocument | null, tourCode: string | null, title: string) => boolean
   label: string
   color: string
-}> = [
-  {
-    predicate: (_t, code, title) =>
-      /ngoài\s?nước|quốc\s?tế|campuchia|thái\s?lan|hàn\s?quốc|nhật\s?bản|china|trung\s?quốc|siam|laos|myanmar|singapore|malaysia/i.test(
-        title,
-      ) || /intl|external|nx|nt/i.test(code || ''),
-    label: 'Nước ngoài',
-    color: '#f97316',
-  },
-  {
-    predicate: (t, _code, title) =>
-      /đoàn|mice|công\s?ty|doanh\s?nghiệp|sự\s?kiện|team\s?building/i.test(title) ||
-      (!!t && t.type === 'group'),
-    label: 'Đoàn riêng / MICE',
-    color: '#0ea5e9',
-  },
-  {
-    predicate: (_t, _code, title) => /tour\s?xe|xe\s?khách|limo|bus|đường\s?bộ/i.test(title),
-    label: 'Tour xe / Đường bộ',
-    color: '#10b981',
-  },
-]
+}> = []
 
 const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
 const PAYMENT_META: Record<Booking['paymentMethod'], { label: string; color: string }> = {
@@ -281,7 +260,7 @@ export class ReportsService {
         return { category: meta.label, color: meta.color }
       }
     }
-    return { category: 'Tour Việt Nam nội địa', color: '#64748b' }
+    return { category: 'Trong nước', color: '#2563eb' }
   }
 
   private inferRegion(tour: TourDocument | null, tourCode: string | null, title: string): string {

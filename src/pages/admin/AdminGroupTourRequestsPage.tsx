@@ -4,7 +4,6 @@ import PageHeader from '@/components/ui/PageHeader'
 import { useToast } from '@/components/notifications/ToastProvider'
 import { getStoredUser } from '@/features/auth/auth'
 import {
-  adminSeedSamples,
   fetchAdminGroupTourRequests,
   fetchAdminStaffList,
   GROUP_TOUR_PRIORITY_META,
@@ -28,77 +27,8 @@ const TABS = [
   { key: 'negotiating', label: 'Đàm phán', countOf: 'negotiating', chip: 'bg-violet-50 text-violet-700 border border-violet-100', icon: '🤝' },
   { key: 'urgent', label: '🔴 KHẨN CẤP', countOf: null, chip: 'bg-rose-50 text-rose-700 border border-rose-200', icon: '🚨' },
   { key: 'won', label: 'Đã chốt → Booking', countOf: null, chip: 'bg-emerald-50 text-emerald-700 border border-emerald-200', icon: '🏆' },
-  { key: 'lost', label: 'Thua đơn', countOf: 'lost', chip: 'bg-rose-50 text-rose-600 border border-rose-100', icon: '💔' },
+  { key: 'lost', label: 'Hủy yêu cầu', countOf: 'lost', chip: 'bg-rose-50 text-rose-600 border border-rose-100', icon: '💔' },
 ]
-
-function buildDemo(n = 40): GroupTourRequest[] {
-  const companies = ['Công ty TNHH Viễn thông ABC', 'Tập đoàn XYZ Group', 'Trường THPT Chuyên Hà Nội', 'Câu lạc bộ Chạy bộ Hanoi Runners', 'Công ty Cổ phần Dịch vụ Du lịch Miền Tây', 'Ngân hàng Đông Á', 'Văn phòng ĐKKD Quận 1', 'Đoàn Gia đình Nguyễn Thị A (50 người)', 'Công ty Phần mềm F-Corp', 'Tập đoàn Tiên Phong']
-  const destinations = ['Hạ Long', 'Sa Pa', 'Ninh Bình', 'Phú Quốc', 'Đà Lạt', 'Mũi Né', 'Côn Đảo', 'Hà Giang', 'Bà Nà Hills', 'Biển Nha Trang']
-  const services = [
-    { needVisa: false, needFlight: false, needBus: true, needHotel: true, needMeals: true, needGuide: true },
-    { needVisa: true, needFlight: true, needBus: true, needHotel: true, needMeals: true, needGuide: true },
-    { needVisa: false, needFlight: false, needBus: true, needHotel: true, needMeals: false, needGuide: true },
-  ]
-  const statuses: GroupTourRequestStatus[] = ['new', 'contacted', 'quoting', 'negotiating', 'won', 'lost', 'archived', 'converted_booking']
-  const priorities: GroupTourRequestPriority[] = ['low', 'normal', 'high', 'urgent']
-  const firstNames = ['Nam', 'Linh', 'Tuấn', 'Hương', 'Trang', 'Khánh', 'Đức', 'Hà', 'Thảo', 'Anh']
-  const rows: GroupTourRequest[] = []
-  const now = Date.now()
-  for (let i = 0; i < n; i += 1) {
-    const adults = 10 + Math.floor(Math.random() * 120)
-    const child = Math.floor(Math.random() * 15)
-    const infant = Math.floor(Math.random() * 5)
-    const compIdx = Math.floor(Math.random() * companies.length)
-    const dest = destinations[Math.floor(Math.random() * destinations.length)]
-    const status = statuses[Math.min(statuses.length - 1, Math.floor(i / (n / statuses.length)) + Math.floor(Math.random() * 2))]
-    const priority: GroupTourRequestPriority = (i % 7 === 0 ? 'urgent' : i % 4 === 0 ? 'high' : priorities[Math.floor(Math.random() * priorities.length)])
-    const created = new Date(now - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000))
-    const company = companies[compIdx]
-    const start = new Date(now + Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000)
-    const budget = 2500000 + Math.floor(Math.random() * 8) * 500000
-    const id = 'demo_' + i + '_' + Math.floor(Math.random() * 1e6)
-    rows.push({
-      _id: id, id,
-      code: `GTR${String(created.getFullYear() % 100).padStart(2, '0')}${String(created.getMonth() + 1).padStart(2, '0')}${String(created.getDate()).padStart(2, '0')}-${String(i + 1).padStart(3, '0')}`,
-      status, priority,
-      contactName: 'Anh ' + firstNames[i % firstNames.length] + ' Văn ' + String.fromCharCode(65 + (i % 24)),
-      contactPhone: '09' + String(10000000 + Math.floor(Math.random() * 89999999)),
-      contactEmail: i % 3 === 0 ? null : `contact${i}@company${i % 5}.vn`,
-      contactRole: i % 3 === 0 ? 'Trưởng phòng Nhân sự' : i % 5 === 0 ? 'Giám đốc hành chính' : null,
-      companyOrGroupName: company,
-      companyTaxCode: i % 2 === 0 ? '010' + String(100000 + Math.floor(Math.random() * 899999)) : null,
-      adultCount: adults,
-      childCount: child,
-      infantCount: infant,
-      departureCity: i % 2 ? 'Hà Nội' : 'TP. Hồ Chí Minh',
-      destination: dest,
-      approximateDurationText: `${3 + (i % 5)} ngày ${2 + (i % 4)} đêm`,
-      preferredStartDate: i % 6 === 0 ? null : start.toISOString().slice(0, 10),
-      preferredEndDate: null,
-      hotelClassRequested: i % 4 === 0 ? '5 sao' : '4 sao',
-      servicesPreference: services[i % services.length],
-      transportRequestedNotes: i % 3 === 0 ? 'Cần xe 45 chỗ Limousine, đón ở Công ty Quận 1' : null,
-      budgetPerPersonVnd: budget,
-      totalBudgetVnd: budget * (adults + child),
-      specialRequirements: i % 2 === 0 ? '15 phòng 2 người + 1 phòng 3 người. Ăn chay 5 người. Cần quà tặng tour cho đoàn.' : null,
-      quoteCount: Math.floor(Math.random() * 4),
-      lastQuoteSummary: i % 4 === 0 ? null : `Đã báo giá phương án 4 sao - xe 29 chỗ: ${formatMoney(budget)}/ người`,
-      followUpAt: new Date(now + Math.floor(Math.random() * 6) * 24 * 60 * 60 * 1000).toISOString(),
-      lastContactedAt: i % 3 === 0 ? null : new Date(now - Math.floor(Math.random() * 3) * 24 * 60 * 60 * 1000).toISOString(),
-      wonAt: status === 'won' || status === 'converted_booking' ? new Date(now - Math.floor(Math.random() * 2) * 24 * 60 * 60 * 1000).toISOString() : null,
-      assignedStaffId: i % 3 === 0 ? null : 'staff_' + String.fromCharCode(65 + (i % 5)),
-      convertedBookingId: status === 'converted_booking' ? 'BK_' + i + '_BOOKING' : null,
-      lostReason: status === 'lost' ? ['Khách chọn đối thủ cạnh tranh', 'Chuyến bị hoãn do kế hoạch công ty', 'Vượt ngân sách của khách'][Math.floor(Math.random() * 3)] : null,
-      internalStaffNote: i % 4 === 0 ? null : 'Gọi lại sau 2h chiều nay, khách đang họp hành chính.',
-      createdByUserId: i % 5 === 0 ? null : 'user_' + i,
-      sourceChannel: i % 6 === 0 ? 'Referral (khách cũ giới thiệu)' : 'website_group_form',
-      ipAddress: null,
-      createdAt: created.toISOString(),
-      updatedAt: created.toISOString(),
-    })
-  }
-  return rows.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-}
 
 function countStatuses(rows: GroupTourRequest[]) {
   const out: Record<string, number> = { all: rows.length, urgent: 0, won: 0 }
@@ -132,31 +62,15 @@ export default function AdminGroupTourRequestsPage() {
   const assignedStaff = sp.get('assignee') || ''
   const [staffList, setStaffList] = useState<StaffBrief[]>([])
   const [bulkStaffId, setBulkStaffId] = useState('')
-  const [seedLoading, setSeedLoading] = useState(false)
-  const doSeedSamples = useCallback(async () => {
-    try {
-      setSeedLoading(true)
-      const res = await adminSeedSamples()
-      if (res?.skipped) toast.warning(res.message || 'Đã có dữ liệu mẫu, bỏ qua tạo thêm.')
-      else toast.success(`Đã tạo ${res?.created || 0} yêu cầu Tour đoàn mẫu (${res?.staffCount || 0} staff đã tham gia phân công).`)
-      await load()
-      void loadStaff()
-    } catch (e) { toast.error((e as any)?.message || 'Tạo mẫu thất bại.') } finally { setSeedLoading(false) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast])
   const loadStaff = useCallback(async () => {
     try {
       const res = await fetchAdminStaffList()
       setStaffList(res.rows || [])
     } catch (e) {
-      setStaffList([
-        { id: 'demo_staff_A', name: 'NV. A (Tours North)', email: 'staff-a@demo.local', phone: null, avatarUrl: null },
-        { id: 'demo_staff_B', name: 'NV. B (Tours South)', email: 'staff-b@demo.local', phone: null, avatarUrl: null },
-        { id: 'demo_staff_C', name: 'NV. C (Miền Tây)', email: 'staff-c@demo.local', phone: null, avatarUrl: null },
-        { id: 'demo_staff_D', name: 'NV. D (Doanh nghiệp VIP)', email: 'staff-d@demo.local', phone: null, avatarUrl: null },
-      ])
-      toast.warning((e as any)?.message || 'Staff list fallback demo.')
+      toast.warning((e as any)?.message || 'Không tải được danh sách nhân viên (Vào Quản trị → Người dùng để tạo staff).')
+      setStaffList([])
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast])
   useEffect(() => { void loadStaff() }, [loadStaff])
   useEffect(() => {
@@ -179,56 +93,27 @@ export default function AdminGroupTourRequestsPage() {
         search: searchDeb, sort, assignedStaffId: assignedStaff || undefined,
       })
       if (nonce !== nonceRef.current) return
-      setRows(res.rows || [])
+      const list = (res.rows || []).map((r) => ({ ...r, assignedStaffId: r.assignedStaffId ? String(r.assignedStaffId) : null }))
+      setRows(list)
       setTotal(Number(res.total || 0))
       setInitialLoading(false)
       setStale(false)
     } catch (e) {
       if (nonce !== nonceRef.current) return
-      const demo = buildDemo(60)
-      const filt = demo.filter((r) => {
-        if (statusF && r.status !== statusF) return false
-        if (priorityF && r.priority !== priorityF) return false
-        if (wonFilter && r.status !== 'won' && r.status !== 'converted_booking') return false
-        if (minGuests !== '' && totalGroupTourGuests(r) < Number(minGuests)) return false
-        if (searchDeb) {
-          const kw = searchDeb.toLowerCase()
-          const hay = [r.code, r.contactName, r.companyOrGroupName, r.destination, r.contactPhone].filter(Boolean).join(' ').toLowerCase()
-          if (!hay.includes(kw)) return false
-        }
-        return true
-      })
-      setTotal(filt.length)
-      const start = (page - 1) * pageSize
-      const sorted = [...filt]
-      if (sort === 'oldest') sorted.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))
-      else if (sort === 'priority') {
-        const ord: Record<string, number> = { urgent: 4, high: 3, normal: 2, low: 1 }
-        sorted.sort((a, b) => (ord[b.priority] || 0) - (ord[a.priority] || 0) || +new Date(b.createdAt) - +new Date(a.createdAt))
-      } else if (sort === 'follow_up') sorted.sort((a, b) => +new Date(a.followUpAt || '2999-01-01') - +new Date(b.followUpAt || '2999-01-01'))
-      else sorted.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-      setRows(sorted.slice(start, start + pageSize))
+      setRows([])
+      setTotal(0)
       setInitialLoading(false)
       setStale(false)
-      toast.warning((e as any)?.message || 'API offline: đang hiển thị dữ liệu mẫu Tour đoàn.')
+      toast.warning((e as any)?.message || 'Không thể tải danh sách Tour đoàn (vui lòng kiểm tra server).')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusF, priorityF, wonFilter, searchDeb, sort, assignedStaff, minGuests])
   useEffect(() => { void load() }, [load])
   const stats = useMemo(() => countStatuses(initialLoading ? [] : rows.concat()), [rows, initialLoading])
-  // total stats use full demo fallback
   const totalStats = useMemo(() => {
-    if (total > 0 && rows.length > 0) {
-      // rough stat from current rows; accurate stat is server aggregation
-      const merged = initialLoading ? [] : [...rows]
-      return countStatuses(merged)
-    }
-    // simulate counts for demo state using full dataset rough percentages
-    const all = total || 60
-    return {
-      all, new: Math.ceil(all * 0.22), quoting: Math.ceil(all * 0.2), negotiating: Math.ceil(all * 0.18),
-      urgent: Math.ceil(all * 0.12), won: Math.ceil(all * 0.14), lost: Math.ceil(all * 0.08),
-    }
+    if (total > 0 || rows.length > 0) return countStatuses(initialLoading ? [] : [...rows])
+    const all = total || 0
+    return { all, new: 0, quoting: 0, negotiating: 0, urgent: 0, won: 0, lost: 0 }
   }, [rows, total, initialLoading])
   void stats
   const applySearch = (next: Partial<Record<string, string>>) => {
@@ -282,15 +167,10 @@ export default function AdminGroupTourRequestsPage() {
         title="👔 Tour đoàn (Yêu cầu báo giá)"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              disabled={seedLoading}
-              onClick={() => { void doSeedSamples() }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-emerald-300 bg-gradient-to-r from-emerald-600 to-teal-600 px-4 text-xs font-black uppercase text-white hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 shadow-sm"
-            >🌱 {seedLoading ? 'Đang tạo...' : 'Tạo 7 mẫu YC'}</button>
             <select
               value={bulkStaffId}
               onChange={(e) => setBulkStaffId(e.target.value)}
-              className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none ring-blue-50 focus:border-blue-500 focus:ring-4"
             >
               <option value="">👷 Chọn nhân viên...</option>
               {staffList.map((s) => <option key={s.id} value={s.id}>👷 {s.name} {s.phone ? `(${s.phone})` : ''}</option>)}
@@ -298,16 +178,16 @@ export default function AdminGroupTourRequestsPage() {
             <button
               disabled={!bulkStaffId}
               onClick={() => bulkAssign(bulkStaffId || null)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-4 text-xs font-black uppercase text-white hover:opacity-95 disabled:opacity-50"
-            >Giao staff</button>
-            <button onClick={() => bulkAssign(null)} className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black uppercase text-slate-700 hover:bg-slate-50">🔓 Thu hồi</button>
-            <button onClick={() => bulkStatus('won')} className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-emerald-600 px-4 text-xs font-black uppercase text-white hover:bg-emerald-700">✅ Chốt (Won) chọn</button>
-            <button onClick={() => bulkStatus('lost')} className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-rose-500 px-4 text-xs font-black uppercase text-white hover:bg-rose-600">💔 Thua chọn</button>
-            <a href="tel:19001009" className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black uppercase text-slate-700 hover:bg-slate-50">📞 1900 1009</a>
+              className="inline-flex h-11 items-center gap-2 rounded-2xl bg-indigo-600 px-5 text-xs font-black uppercase text-white shadow-sm shadow-indigo-600/10 hover:bg-indigo-700 disabled:opacity-50"
+            >Giao nhân viên</button>
+            <button onClick={() => bulkAssign(null)} className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 text-xs font-black uppercase text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100">🔓 Thu hồi</button>
+            <button onClick={() => bulkStatus('won')} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-600 px-5 text-xs font-black uppercase text-white shadow-sm shadow-emerald-600/10 hover:bg-emerald-700">✅ Xác nhận Booking</button>
+            <button onClick={() => bulkStatus('lost')} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-rose-600 px-5 text-xs font-black uppercase text-white shadow-sm shadow-rose-600/10 hover:bg-rose-700">❌ Hủy yêu cầu</button>
+            <a href="tel:19001009" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-xs font-black uppercase text-slate-700 hover:bg-slate-50">📞 1900 1009</a>
           </div>
         }
       />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2.5 2xl:gap-3">
         {TABS.map((t) => {
           const k = t.key
           const active = tab === k
@@ -319,45 +199,45 @@ export default function AdminGroupTourRequestsPage() {
               key={k}
               onClick={() => applySearch({ tab: k })}
               className={clsx(
-                'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-extrabold transition',
-                active ? 'border-orange-400 bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 text-white shadow-md' : meta ? meta.chip : t.chip + ' hover:border-orange-300 hover:bg-orange-50',
+                'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm font-extrabold transition shadow-sm',
+                active ? 'border-indigo-400 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-500/20' : meta ? meta.chip + ' hover:border-blue-400 hover:bg-blue-50' : t.chip + ' hover:border-blue-400 hover:bg-blue-50',
               )}
             >
-              <span className="text-sm">{t.icon}</span>
-              <span className="uppercase tracking-wide">{t.label}</span>
-              <span className={clsx('rounded-full px-2 py-0.5 text-[10px]', active ? 'bg-white/20 text-white' : 'bg-white/80 text-slate-700 border border-white/40')}>{badge}</span>
+              <span className="text-base 2xl:text-lg">{t.icon}</span>
+              <span className="uppercase tracking-wider whitespace-nowrap">{t.label}</span>
+              <span className={clsx('rounded-full px-3 py-1 text-xs font-black whitespace-nowrap', active ? 'bg-white/20 text-white ring-1 ring-white/30' : 'bg-white text-slate-700 border border-slate-200 shadow-sm')}>{badge}</span>
             </button>
           )
         })}
       </div>
-      <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-12">
+      <div className="grid gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4.5 shadow-sm md:grid-cols-12 2xl:px-6 2xl:py-5">
         <div className="md:col-span-3">
-          <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm (Mã / Tên / Công ty / SĐT / Đích)</label>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nhập từ khóa..." className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" />
+          <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Tìm kiếm (Mã / Tên / Công ty / SĐT / Đích)</label>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nhập từ khóa..." className="mt-1.5 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] 2xl:text-base outline-none ring-blue-50 focus:border-blue-500 focus:ring-4" />
         </div>
         <div className="md:col-span-2">
-          <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Độ ưu tiên</label>
-          <select value={priorityF || ''} onChange={(e) => applySearch({ priority: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-orange-400">
+          <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Độ ưu tiên</label>
+          <select value={priorityF || ''} onChange={(e) => applySearch({ priority: e.target.value })} className="mt-1.5 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] 2xl:text-base outline-none ring-blue-50 focus:border-blue-500 focus:ring-4">
             <option value="">Tất cả</option>
             <option value="low">Thấp</option><option value="normal">Bình thường</option><option value="high">Cao</option><option value="urgent">🔴 Khẩn cấp</option>
           </select>
         </div>
         <div className="md:col-span-2">
-          <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Min số hành khách</label>
-          <input type="number" min={0} value={minGuests} onChange={(e) => setMinGuests(e.target.value === '' ? '' : Number(e.target.value))} onBlur={() => applySearch({ ming: minGuests === '' ? '' : String(minGuests) })} placeholder="VD: 20" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-orange-400" />
+          <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Min số hành khách</label>
+          <input type="number" min={0} value={minGuests} onChange={(e) => setMinGuests(e.target.value === '' ? '' : Number(e.target.value))} onBlur={() => applySearch({ ming: minGuests === '' ? '' : String(minGuests) })} placeholder="VD: 20" className="mt-1.5 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] 2xl:text-base outline-none ring-blue-50 focus:border-blue-500 focus:ring-4" />
         </div>
         <div className="md:col-span-2">
-          <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Sort</label>
-          <select value={sort} onChange={(e) => applySearch({ sort: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-orange-400">
+          <label className="block text-xs font-black uppercase tracking-wide text-slate-500">Sắp xếp</label>
+          <select value={sort} onChange={(e) => applySearch({ sort: e.target.value })} className="mt-1.5 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] 2xl:text-base outline-none ring-blue-50 focus:border-blue-500 focus:ring-4">
             <option value="newest">Mới nhất</option>
             <option value="oldest">Cũ nhất</option>
             <option value="priority">Ưu tiên cao trước</option>
             <option value="follow_up">Theo giờ theo dõi (CSKH)</option>
           </select>
         </div>
-        <div className="md:col-span-3 flex items-end gap-2">
-          <button onClick={() => load()} className="h-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:bg-white">🔄 Tải lại</button>
-          <button onClick={() => { setSearch(''); setMinGuests(''); setSort('newest'); applySearch({ tab: 'all', page: '1', search: '', sort: 'newest', assignee: '', ming: '' }) }} className="h-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3 text-xs font-black uppercase text-white hover:bg-orange-600">↺ Reset</button>
+        <div className="md:col-span-3 flex items-end gap-2.5">
+          <button onClick={() => load()} className="h-11 inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 hover:bg-white ring-1 ring-slate-100">🔄 Tải lại</button>
+          <button onClick={() => { setSearch(''); setMinGuests(''); setSort('newest'); applySearch({ tab: 'all', page: '1', search: '', sort: 'newest', assignee: '', ming: '' }) }} className="h-11 inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-xs font-black uppercase text-white hover:bg-orange-600 shadow-sm shadow-orange-500/20">↺ Reset</button>
         </div>
       </div>
 
@@ -365,44 +245,63 @@ export default function AdminGroupTourRequestsPage() {
         {initialLoading ? (
           <div className="divide-y divide-slate-100">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="grid grid-cols-[40px_120px_160px_1fr_160px_80px_180px_160px_140px_180px_160px] gap-3 px-4 py-4">
-                <div className="h-4 w-4 animate-pulse rounded bg-slate-200" />
-                <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-                <div className="h-10 w-40 animate-pulse rounded bg-slate-200" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-                <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
-                <div className="h-6 w-16 animate-pulse rounded bg-slate-200" />
-                <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-                <div className="h-5 w-28 animate-pulse rounded bg-slate-200" />
-                <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
-                <div className="h-8 w-40 animate-pulse rounded bg-slate-200" />
-                <div className="h-8 w-36 animate-pulse rounded bg-slate-200" />
+              <div key={i} className="grid grid-cols-[56px_180px_320px_300px_380px_120px_220px_240px_160px_200px_260px_200px_200px_400px] gap-4 px-6 py-5">
+                <div className="h-5 w-5 animate-pulse rounded bg-slate-200" />
+                <div className="h-5 w-32 animate-pulse rounded bg-slate-200" />
+                <div className="h-12 w-64 animate-pulse rounded bg-slate-200" />
+                <div className="h-8 w-full animate-pulse rounded bg-slate-200" />
+                <div className="h-8 w-full animate-pulse rounded bg-slate-200" />
+                <div className="h-8 w-20 animate-pulse rounded bg-slate-200" />
+                <div className="h-5 w-48 animate-pulse rounded bg-slate-200" />
+                <div className="h-6 w-40 animate-pulse rounded bg-slate-200" />
+                <div className="h-7 w-32 animate-pulse rounded bg-slate-200" />
+                <div className="h-7 w-36 animate-pulse rounded bg-slate-200" />
+                <div className="h-8 w-52 animate-pulse rounded bg-slate-200" />
+                <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
+                <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
+                <div className="h-10 w-96 animate-pulse rounded bg-slate-200" />
               </div>
             ))}
           </div>
         ) : (
-          <table className="min-w-[1680px] w-full text-sm">
-            <thead className="bg-gradient-to-r from-blue-900 via-blue-800 to-orange-600 text-white text-[11px] uppercase tracking-wide">
+          <table className="min-w-full w-full text-sm border-separate border-spacing-0">
+            <colgroup>
+              <col style={{ minWidth: 56 }} />
+              <col style={{ minWidth: 180 }} />
+              <col style={{ minWidth: 320 }} />
+              <col style={{ minWidth: 300 }} />
+              <col style={{ minWidth: 380 }} />
+              <col style={{ minWidth: 120 }} />
+              <col style={{ minWidth: 220 }} />
+              <col style={{ minWidth: 240 }} />
+              <col style={{ minWidth: 160 }} />
+              <col style={{ minWidth: 200 }} />
+              <col style={{ minWidth: 260 }} />
+              <col style={{ minWidth: 200 }} />
+              <col style={{ minWidth: 200 }} />
+              <col style={{ minWidth: 420 }} />
+            </colgroup>
+            <thead className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-800 text-white text-[11px] 2xl:text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-3 py-3 text-left w-12"><input type="checkbox" className="accent-orange-500 h-4 w-4" checked={rows.length > 0 && selected.size === rows.length} onChange={toggleAll} /></th>
-                <th className="px-3 py-3 text-left">Mã</th>
-                <th className="px-3 py-3 text-left">Liên hệ</th>
-                <th className="px-3 py-3 text-left">Công ty / Đoàn</th>
-                <th className="px-3 py-3 text-left">Đích / Tour</th>
-                <th className="px-3 py-3 text-center">👥</th>
-                <th className="px-3 py-3 text-left">Ngày / Thời gian</th>
-                <th className="px-3 py-3 text-left">Ngân sách</th>
-                <th className="px-3 py-3 text-left">Ưu tiên</th>
-                <th className="px-3 py-3 text-left">Trạng thái</th>
-                <th className="px-3 py-3 text-left">Nhân viên phụ trách</th>
-                <th className="px-3 py-3 text-left">Giờ theo dõi</th>
-                <th className="px-3 py-3 text-left">Tạo lúc</th>
-                <th className="px-3 py-3 pr-5 text-right">Hành động</th>
+                <th className="px-6 py-4 text-left w-14"><input type="checkbox" className="accent-orange-500 h-5 w-5" checked={rows.length > 0 && selected.size === rows.length} onChange={toggleAll} /></th>
+                <th className="px-6 py-4 text-left">Mã</th>
+                <th className="px-6 py-4 text-left">Liên hệ</th>
+                <th className="px-6 py-4 text-left">Công ty / Đoàn</th>
+                <th className="px-6 py-4 text-left">Đích / Dịch vụ</th>
+                <th className="px-6 py-4 text-center">👥 Số khách</th>
+                <th className="px-6 py-4 text-left">Ngày đi / Thời gian</th>
+                <th className="px-6 py-4 text-left">Ngân sách</th>
+                <th className="px-6 py-4 text-left">Ưu tiên</th>
+                <th className="px-6 py-4 text-left">Trạng thái</th>
+                <th className="px-6 py-4 text-left">Nhân viên phụ trách</th>
+                <th className="px-6 py-4 text-left">Giờ theo dõi</th>
+                <th className="px-6 py-4 text-left">Tạo lúc</th>
+                <th className="px-6 py-4 pr-7 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {!rows.length ? (
-                <tr><td colSpan={14} className="px-5 py-16 text-center text-sm text-slate-400">Không có yêu cầu nào thỏa điều kiện lọc.</td></tr>
+                <tr><td colSpan={14} className="px-6 py-20 text-center text-base text-slate-400">Không có yêu cầu nào thỏa điều kiện lọc. Vui lòng thay đổi bộ lọc hoặc chờ khách gửi yêu cầu.</td></tr>
               ) : null}
               {rows.map((r) => {
                 const sel = selected.has(r._id)
@@ -411,118 +310,112 @@ export default function AdminGroupTourRequestsPage() {
                 const statusMeta = GROUP_TOUR_STATUS_META[r.status]
                 const isUrgent = r.priority === 'urgent'
                 return (
-                  <tr key={r._id} className={clsx('hover:bg-orange-50/50', sel && 'bg-orange-50/40', isUrgent && 'bg-rose-50/20')}>
-                    <td className="px-3 py-3 align-top"><input type="checkbox" className="accent-orange-500 h-4 w-4" checked={sel} onChange={() => toggleOne(r._id)} /></td>
-                    <td className="px-3 py-3 align-top font-black text-slate-900">{r.code}</td>
-                    <td className="px-3 py-3 align-top">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 via-orange-500 to-amber-400 text-sm font-black text-white shadow-sm">{r.contactName.slice(0, 1).toUpperCase()}</div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-900 truncate max-w-[220px]"><Users className="h-3.5 w-3.5 text-slate-400" />{r.contactName}</div>
-                          <a href={`tel:${r.contactPhone}`} className="mt-0.5 flex items-center gap-1.5 text-xs text-blue-700 hover:underline"><Phone className="h-3 w-3" />{r.contactPhone}</a>
-                          {r.contactEmail ? <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500 truncate max-w-[220px]">✉️ {r.contactEmail}</div> : null}
-                          {r.contactRole ? <div className="mt-0.5 text-[11px] text-slate-500">💼 {r.contactRole}</div> : null}
+                  <tr key={r._id} className={clsx('hover:bg-blue-50/40 align-top', sel && 'bg-blue-50/30', isUrgent && 'bg-rose-50/10')}>
+                    <td className="px-6 py-5"><input type="checkbox" className="accent-orange-500 h-5 w-5" checked={sel} onChange={() => toggleOne(r._id)} /></td>
+                    <td className="px-6 py-5 font-black text-slate-900 text-[15px] 2xl:text-base whitespace-nowrap font-mono">{r.code}</td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-start gap-3.5">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-lg font-black text-white shadow-sm ring-2 ring-blue-50/80">{r.contactName.slice(0, 1).toUpperCase()}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 font-bold text-slate-900 text-[15px] 2xl:text-base truncate"><Users className="h-4 w-4 text-slate-400 shrink-0" />{r.contactName}</div>
+                          <a href={`tel:${r.contactPhone}`} className="mt-1 flex items-center gap-2 text-sm text-blue-700 font-bold hover:underline whitespace-nowrap"><Phone className="h-3.5 w-3.5 shrink-0" />{r.contactPhone}</a>
+                          {r.contactEmail ? <div className="mt-1 flex items-center gap-2 text-sm text-slate-500 truncate">✉️ <span className="truncate">{r.contactEmail}</span></div> : null}
+                          {r.contactRole ? <div className="mt-1 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">💼 {r.contactRole}</div> : null}
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <div className="flex items-start gap-2">
-                        <Building2 className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />
-                        <div className="min-w-0">
-                          <div className="font-bold text-slate-900 leading-snug break-words max-w-[260px]">{r.companyOrGroupName}</div>
-                          {r.companyTaxCode ? <div className="mt-0.5 text-[11px] text-slate-500">🧾 MST: {r.companyTaxCode}</div> : null}
-                          {r.internalStaffNote ? <div className="mt-1 text-[11px] text-slate-500 italic border-l-2 border-orange-300 pl-2 line-clamp-2 max-w-[260px]">📝 {r.internalStaffNote}</div> : null}
+                    <td className="px-6 py-5">
+                      <div className="flex items-start gap-2.5">
+                        <Building2 className="h-5 w-5 mt-0.5 shrink-0 text-blue-600" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900 leading-snug break-words text-[15px] 2xl:text-base">{r.companyOrGroupName}</div>
+                          {r.companyTaxCode ? <div className="mt-1 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">🧾 MST: {r.companyTaxCode}</div> : null}
+                          {r.internalStaffNote ? <div className="mt-2 text-xs 2xl:text-[13px] text-slate-600 italic border-l-2 border-orange-300 pl-3 line-clamp-3 bg-orange-50/40 py-1.5 pr-2 rounded-r-xl">📝 {r.internalStaffNote}</div> : null}
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-orange-600" />
-                        <div className="min-w-0">
-                          <div className="font-bold text-slate-900">{r.destination}</div>
-                          {r.departureCity ? <div className="mt-0.5 text-[11px] text-slate-500">🚩 {r.departureCity}</div> : null}
-                          {r.approximateDurationText ? <div className="mt-0.5 text-[11px] text-slate-500">⏱ {r.approximateDurationText}</div> : null}
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {r.servicesPreference.needVisa ? <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">🛂 Visa</span> : null}
-                            {r.servicesPreference.needFlight ? <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">✈️ Vé máy bay</span> : null}
-                            {r.servicesPreference.needBus ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">🚌 Xe</span> : null}
-                            {r.servicesPreference.needHotel ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">🏨 KS {r.hotelClassRequested || ''}</span> : null}
-                            {r.servicesPreference.needMeals ? <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700">🍱 Ăn</span> : null}
-                            {r.servicesPreference.needGuide ? <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-700">🧭 HDV</span> : null}
+                    <td className="px-6 py-5">
+                      <div className="flex items-start gap-2.5">
+                        <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-orange-600" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900 text-[15px] 2xl:text-base">{r.destination}</div>
+                          {r.departureCity ? <div className="mt-1 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">🚩 Khởi hành từ: {r.departureCity}</div> : null}
+                          {r.approximateDurationText ? <div className="mt-1 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">⏱ Thời gian: {r.approximateDurationText}</div> : null}
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {r.servicesPreference.needVisa ? <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 ring-1 ring-violet-100 whitespace-nowrap">🛂 Visa</span> : null}
+                            {r.servicesPreference.needFlight ? <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 ring-1 ring-sky-100 whitespace-nowrap">✈️ Vé máy bay</span> : null}
+                            {r.servicesPreference.needBus ? <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 whitespace-nowrap">🚌 Xe du lịch</span> : null}
+                            {r.servicesPreference.needHotel ? <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 ring-1 ring-blue-100 whitespace-nowrap">🏨 KS {r.hotelClassRequested || ''}</span> : null}
+                            {r.servicesPreference.needMeals ? <span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 ring-1 ring-orange-100 whitespace-nowrap">🍱 Bữa ăn</span> : null}
+                            {r.servicesPreference.needGuide ? <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 ring-1 ring-teal-100 whitespace-nowrap">🧭 HDV hướng dẫn</span> : null}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-top text-center">
-                      <div className="font-black text-lg text-slate-900">{guests}</div>
-                      <div className="text-[10px] text-slate-500 uppercase tracking-wide">người</div>
-                      <div className="mt-1 text-[10px] text-slate-500">NL {r.adultCount} · TE {r.childCount} · EB {r.infantCount}</div>
+                    <td className="px-6 py-5 text-center">
+                      <div className="font-black text-2xl 2xl:text-3xl text-slate-900 tabular-nums">{guests}</div>
+                      <div className="text-xs 2xl:text-[13px] text-slate-500 uppercase tracking-wide mt-0.5">khách</div>
+                      <div className="mt-2 space-y-1">
+                        <div className="text-xs 2xl:text-[13px] text-slate-600 whitespace-nowrap"><span className="inline-flex rounded-md bg-slate-100 px-2 py-1 font-bold">NL {r.adultCount}</span> <span className="inline-flex rounded-md bg-orange-50 px-2 py-1 font-bold text-orange-700 ml-1">TE {r.childCount}</span> <span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 font-bold text-emerald-700 ml-1">EB {r.infantCount}</span></div>
+                      </div>
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <CalendarDays className="h-3.5 w-3.5 mb-0.5 inline-block text-slate-400" />
-                      <div className="text-xs font-bold text-slate-800 inline-block ml-1">{r.preferredStartDate ? formatDate(r.preferredStartDate) : 'Chưa xác định'}</div>
-                      {r.approximateDurationText ? <div className="mt-0.5 text-[11px] text-slate-500">{r.approximateDurationText}</div> : null}
-                      {isUrgent ? <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase text-rose-700"><AlertTriangle className="h-3 w-3" /> KHẨN</div> : null}
+                    <td className="px-6 py-5">
+                      <CalendarDays className="h-4 w-4 mb-1 inline-block text-slate-400 shrink-0" />
+                      <div className="text-sm 2xl:text-[15px] font-bold text-slate-800 inline-block ml-1.5 whitespace-nowrap">{r.preferredStartDate ? formatDate(r.preferredStartDate) : 'Chưa xác định'}</div>
+                      {r.approximateDurationText ? <div className="mt-1.5 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">{r.approximateDurationText}</div> : null}
+                      {isUrgent ? <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1.5 text-xs 2xl:text-[13px] font-black uppercase text-rose-700 ring-1 ring-rose-200 whitespace-nowrap"><AlertTriangle className="h-3.5 w-3.5" /> KHẨN CẤP</div> : null}
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      {r.budgetPerPersonVnd ? <div className="font-black text-orange-600">{formatMoney(r.budgetPerPersonVnd)}đ<span className="text-[10px] font-semibold text-slate-400 ml-1">/ng</span></div> : null}
-                      {r.totalBudgetVnd ? <div className="mt-0.5 text-[11px] text-slate-500">Tổng dự kiến: <span className="font-semibold text-slate-700">{formatMoney(r.totalBudgetVnd)}đ</span></div> : null}
-                      {r.lastQuoteSummary ? <div className="mt-1.5 text-[11px] text-emerald-700 border-l-2 border-emerald-300 pl-2 line-clamp-2">💰 {r.lastQuoteSummary}</div> : null}
+                    <td className="px-6 py-5">
+                      {r.budgetPerPersonVnd ? <div className="font-black text-orange-600 text-[17px] 2xl:text-xl tabular-nums whitespace-nowrap">{formatMoney(r.budgetPerPersonVnd)}đ<span className="text-xs 2xl:text-[13px] font-semibold text-slate-400 ml-1.5">/khách</span></div> : null}
+                      {r.totalBudgetVnd ? <div className="mt-1.5 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">Tổng dự kiến: <span className="font-bold text-slate-700">{formatMoney(r.totalBudgetVnd)}đ</span></div> : null}
+                      {r.lastQuoteSummary ? <div className="mt-2.5 text-sm text-emerald-700 border-l-2 border-emerald-300 pl-3 line-clamp-3 bg-emerald-50/40 py-1.5 pr-2 rounded-r-xl font-semibold">💰 {r.lastQuoteSummary}</div> : null}
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <span className={clsx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black uppercase', priority?.chip)}>
-                        <span>{priority?.icon || '🔵'}</span><span>{priority?.label || r.priority}</span>
+                    <td className="px-6 py-5">
+                      <span className={clsx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-xs 2xl:text-[13px] font-black uppercase ring-1', priority?.chip)}>
+                        <span className="text-base">{priority?.icon || '🔵'}</span><span>{priority?.label || r.priority}</span>
                       </span>
-                      <div className="mt-1 text-[10px] text-slate-500">Báo giá {r.quoteCount} lần</div>
+                      <div className="mt-2 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">Đã báo giá: <b className="text-slate-700">{r.quoteCount}</b> lần</div>
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <span className={clsx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black uppercase', statusMeta?.chip)}>
-                        <span className={clsx('h-1.5 w-1.5 rounded-full', statusMeta?.dot)} />
+                    <td className="px-6 py-5">
+                      <span className={clsx('inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs 2xl:text-[13px] font-black uppercase ring-1', statusMeta?.chip)}>
+                        <span className={clsx('h-2 w-2 rounded-full', statusMeta?.dot)} />
                         {statusMeta?.label || r.status}
                       </span>
-                      {r.lostReason ? <div className="mt-1 text-[11px] text-rose-600 italic max-w-[180px] truncate">💔 {r.lostReason}</div> : null}
-                      {r.convertedBookingId ? <div className="mt-1 text-[11px] font-bold text-emerald-700">✅ → {r.convertedBookingId}</div> : null}
+                      {r.lostReason ? <div className="mt-2 text-xs 2xl:text-[13px] text-rose-600 italic line-clamp-3 bg-rose-50/60 rounded-xl border border-rose-100 px-3 py-1.5 whitespace-pre-wrap">💔 {r.lostReason}</div> : null}
+                      {r.convertedBookingId ? <div className="mt-2 text-sm font-black text-emerald-700 whitespace-nowrap bg-emerald-50/80 px-3 py-1.5 rounded-xl border border-emerald-100 inline-flex items-center gap-2">✅ → <span className="font-mono">{r.convertedBookingId}</span></div> : null}
                     </td>
-                    <td className="px-3 py-3 align-top">
+                    <td className="px-6 py-5">
                       <select
                         value={r.assignedStaffId || ''}
                         onChange={async (e) => {
                           try {
                             await patchAdminGroupTourRequest(r._id, { assignedStaffId: e.target.value || null })
-                            toast.success('Đã cập nhật nhân viên.')
+                            toast.success('Đã cập nhật nhân viên phụ trách.')
                             await load()
                           } catch (err) { toast.error((err as any)?.message || 'Lỗi.') }
                         }}
-                        className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 min-w-[170px]"
+                        className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm outline-none ring-blue-50 min-w-full focus:border-blue-500 focus:ring-4"
                       >
-                        <option value="">— Chưa giao —</option>
+                        <option value="">— Chưa phân công —</option>
                         {staffList.map((s) => {
                           const staffName = `${s.name}${s.phone ? ` · ${s.phone}` : ''}`
                           return <option key={s.id} value={s.id}>👷 {staffName}</option>
                         })}
-                        {staffList.length === 0 && (
-                          <>
-                            <option value="demo_staff_A">👷 NV. A (Tours North)</option>
-                            <option value="demo_staff_B">👷 NV. B (Tours South)</option>
-                            <option value="demo_staff_C">👷 NV. C (Miền Tây)</option>
-                            <option value="demo_staff_D">👷 NV. D (Doanh nghiệp VIP)</option>
-                          </>
-                        )}
                       </select>
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <div className="text-[11px] text-slate-500 uppercase tracking-wide">Theo dõi</div>
-                      <div className="text-xs font-bold text-slate-800">{r.followUpAt ? formatDate(r.followUpAt) : '—'}</div>
-                      {r.lastContactedAt ? <div className="mt-1 text-[10px] text-slate-400">Liên hệ gần: {formatDate(r.lastContactedAt)}</div> : <div className="mt-1 text-[10px] text-amber-700">⚠️ Chưa gọi</div>}
+                    <td className="px-6 py-5">
+                      <div className="text-[11px] 2xl:text-xs text-slate-500 uppercase tracking-wide font-black whitespace-nowrap">Theo dõi kế tiếp</div>
+                      <div className="text-sm 2xl:text-[15px] font-bold text-slate-800 mt-1 whitespace-nowrap">{r.followUpAt ? formatDate(r.followUpAt) : '—'}</div>
+                      {r.lastContactedAt ? <div className="mt-1.5 text-xs 2xl:text-[13px] text-slate-500 whitespace-nowrap">LH gần nhất: {formatDate(r.lastContactedAt)}</div> : <div className="mt-1.5 text-xs 2xl:text-[13px] text-amber-700 whitespace-nowrap bg-amber-50 rounded-xl px-3 py-1.5 ring-1 ring-amber-100 inline-flex items-center gap-1.5 font-semibold">⚠️ Chưa gọi khách</div>}
                     </td>
-                    <td className="px-3 py-3 align-top">
-                      <span className="text-xs text-slate-500">{formatDateTime(r.createdAt)}</span>
+                    <td className="px-6 py-5">
+                      <span className="text-sm 2xl:text-[15px] text-slate-500 whitespace-nowrap">{formatDateTime(r.createdAt)}</span>
                     </td>
-                    <td className="px-3 py-3 align-top pr-4">
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        <button onClick={async () => { await patchAdminGroupTourRequest(r._id, { status: 'contacted', lastContactedAt: new Date().toISOString(), followUpAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString() }); toast.success('Đánh dấu Đã liên hệ.'); await load() }} className="inline-flex h-8 items-center gap-1 rounded-xl bg-sky-500 px-3 text-[11px] font-black uppercase text-white hover:bg-sky-600">📞 Đã LH</button>
-                        <button onClick={async () => { await patchAdminGroupTourRequest(r._id, { status: 'quoting' }); toast.success('Chuyển trạng thái Đang báo giá.'); await load() }} className="inline-flex h-8 items-center gap-1 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase text-white hover:bg-amber-600">💵 Báo giá</button>
-                        <button onClick={async () => { await patchAdminGroupTourRequest(r._id, { status: 'won' }); toast.success('🎉 Chốt đơn thành công!'); await load() }} className="inline-flex h-8 items-center gap-1 rounded-xl bg-emerald-600 px-3 text-[11px] font-black uppercase text-white hover:bg-emerald-700">🏆 Chốt</button>
+                    <td className="px-6 py-5 pr-7">
+                      <div className="flex flex-wrap items-center justify-end gap-2.5">
+                        <button onClick={async () => { await patchAdminGroupTourRequest(r._id, { status: 'contacted', lastContactedAt: new Date().toISOString(), followUpAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString() }); toast.success('Đánh dấu Đã liên hệ khách.'); await load() }} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-sky-600 px-4.5 text-[10px] 2xl:text-xs font-black uppercase text-white shadow-sm shadow-sky-600/10 hover:bg-sky-700 whitespace-nowrap">📞 Đã LH</button>
+                        <button onClick={async () => { await patchAdminGroupTourRequest(r._id, { status: 'quoting' }); toast.success('Chuyển trạng thái: Đang báo giá khách.'); await load() }} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-amber-500 px-4.5 text-[10px] 2xl:text-xs font-black uppercase text-white shadow-sm shadow-amber-500/20 hover:bg-amber-600 whitespace-nowrap">💵 Báo giá</button>
+                        <button onClick={async () => { await patchAdminGroupTourRequest(r._id, { status: 'won' }); toast.success('🎉 Đã chốt đơn Tour đoàn - chuyển qua tạo Booking.'); await load() }} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-emerald-600 px-4.5 text-[10px] 2xl:text-xs font-black uppercase text-white shadow-sm shadow-emerald-600/10 hover:bg-emerald-700 whitespace-nowrap">✅ Chốt đơn</button>
                       </div>
                     </td>
                   </tr>
@@ -533,21 +426,21 @@ export default function AdminGroupTourRequestsPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-3 shadow-sm border border-slate-200">
-        <div className="text-xs text-slate-500">
-          Hiện thị <b>{rows.length}</b> / tổng <b>{total || 0}</b> yêu cầu · Chọn <b className="text-orange-600">{selected.size}</b> dòng
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-6 py-4.5 shadow-sm border border-slate-200">
+        <div className="text-sm 2xl:text-[15px] text-slate-500">
+          Hiện thị <b className="text-slate-800">{rows.length}</b> / tổng <b className="text-slate-800">{total || 0}</b> yêu cầu · Chọn <b className="text-orange-600">{selected.size}</b> dòng
         </div>
-        <div className="flex items-center gap-1">
-          <button disabled={page <= 1} onClick={() => applySearch({ page: String(Math.max(1, page - 1)) })} className="h-9 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">← Trước</button>
+        <div className="flex items-center gap-2">
+          <button disabled={page <= 1} onClick={() => applySearch({ page: String(Math.max(1, page - 1)) })} className="h-11 inline-flex items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">← Trước</button>
           {Array.from({ length: Math.min(5, totalPages) }).map((_, off) => {
             const start = Math.max(1, Math.min(page - 2, totalPages - 4))
             const p = start + off
             if (p > totalPages) return null
             return (
-              <button key={p} onClick={() => applySearch({ page: String(p) })} className={clsx('h-9 min-w-[2.25rem] inline-flex items-center justify-center rounded-xl px-3 text-xs font-black', page === p ? 'bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 text-white shadow-md' : 'border border-slate-200 bg-white text-slate-700 hover:bg-orange-50')}>{p}</button>
+              <button key={p} onClick={() => applySearch({ page: String(p) })} className={clsx('h-11 min-w-[2.75rem] inline-flex items-center justify-center rounded-2xl px-4 text-sm font-black', page === p ? 'bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'border border-slate-200 bg-white text-slate-700 hover:bg-blue-50 hover:border-blue-300')}>{p}</button>
             )
           })}
-          <button disabled={page >= totalPages} onClick={() => applySearch({ page: String(page + 1) })} className="h-9 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Sau →</button>
+          <button disabled={page >= totalPages} onClick={() => applySearch({ page: String(page + 1) })} className="h-11 inline-flex items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Sau →</button>
         </div>
       </div>
     </div>

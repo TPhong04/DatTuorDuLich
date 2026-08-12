@@ -327,7 +327,7 @@ export default function AdminContentReviewsPage() {
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</label>
               <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Tên KH / Nội dung / Tour..." className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:ring-4 focus:ring-orange-200" />
             </div>
-            <button type="button" onClick={() => load()} className="inline-flex h-10 shrink-0 items-center rounded-xl bg-orange-500 px-4 text-xs font-extrabold uppercase text-white shadow-sm hover:bg-orange-600">Tìm</button>
+            <button type="button" onClick={() => load()} className="inline-flex h-10 shrink-0 items-center rounded-xl bg-orange-500 px-4 text-[10px] font-extrabold uppercase text-white shadow-sm hover:bg-orange-600">Tìm</button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
