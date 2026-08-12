@@ -65,32 +65,32 @@ export function KpiCard({
       onClick={onClick}
       type="button"
       className={cn(
-        'group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br p-5 text-left shadow-sm ring-1 ring-inset transition hover:-translate-y-0.5 hover:shadow-md',
+        'group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br p-6 text-left shadow-sm ring-1 ring-inset transition hover:-translate-y-0.5 hover:shadow-md sm:p-7',
         t.bg,
         t.ring,
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
-      <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-white to-transparent opacity-70 blur-2xl" />
-      <div className="relative flex items-start justify-between gap-3">
+      <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-gradient-to-br from-white to-transparent opacity-70 blur-2xl" />
+      <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-          <div className={cn('mt-2 text-3xl font-black tracking-tight', t.text)}>{value}</div>
-          {sub ? <div className="mt-1 text-xs text-slate-500">{sub}</div> : null}
+          <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+          <div className={cn('mt-3 text-4xl font-black tracking-tight sm:text-5xl', t.text)}>{value}</div>
+          {sub ? <div className="mt-2 text-xs text-slate-500 sm:text-sm">{sub}</div> : null}
         </div>
-        <div className={cn('flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-inset', t.iconBg)}>
+        <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset sm:h-14 sm:w-14', t.iconBg)}>
           {icon}
         </div>
       </div>
       {trendPct ? (
-        <div className="relative mt-4 flex items-center gap-1.5 text-[11px] font-bold">
+        <div className="relative mt-5 flex items-center gap-2 text-xs font-bold sm:text-[13px]">
           <span
             className={cn(
-              'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5',
+              'inline-flex items-center gap-0.5 rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5',
               trend === 'up' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700',
             )}
           >
-            {trend === 'up' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+            {trend === 'up' ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
             {trendPct.toFixed(1)}%
           </span>
           <span className="text-slate-500">so với tuần trước</span>
@@ -137,12 +137,12 @@ const payLabel: Record<Booking['paymentStatus'], string> = {
 
 export function BookingStatusBadge({ status, paymentStatus }: BookingStatusBadgeProps) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset', statusTone[status])}>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={cn('inline-flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-black ring-1 ring-inset', statusTone[status])}>
         {statusLabel[status]}
       </span>
       {paymentStatus ? (
-        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset', payTone[paymentStatus])}>
+        <span className={cn('inline-flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] 2xl:text-xs font-bold ring-1 ring-inset', payTone[paymentStatus])}>
           {payLabel[paymentStatus]}
         </span>
       ) : null}
@@ -290,7 +290,14 @@ const timelineTone: Record<TimelineEvent['tone'], string> = {
   rose: 'bg-rose-500 ring-rose-100',
 }
 
-export function ActivityTimeline({ items }: { items: TimelineEvent[] }) {
+export function ActivityTimeline({ items, emptyText = 'Chưa có hoạt động' }: { items: TimelineEvent[]; emptyText?: string }) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 py-12 text-center text-sm text-slate-400">
+        {emptyText}
+      </div>
+    )
+  }
   return (
     <ol className="relative space-y-4 pl-8">
       <span className="absolute left-[13px] top-1 bottom-1 w-px bg-slate-200" />
@@ -358,39 +365,50 @@ export function RecentBookingsTable({ items }: { items: Booking[] }) {
     cancelled: 'bg-rose-500',
   }
   return (
-    <div className="-mx-5 overflow-x-auto">
-      <table className="min-w-full border-separate border-spacing-0 text-sm">
+    <div className="-mx-5 -my-1 overflow-x-auto px-5 py-1">
+      <table className="min-w-full w-full border-separate border-spacing-0 text-sm">
+        <colgroup>
+          <col style={{ minWidth: 56 }} />
+          <col style={{ minWidth: 170 }} />
+          <col style={{ minWidth: 260 }} />
+          <col style={{ minWidth: 150 }} />
+          <col style={{ minWidth: 420 }} />
+          <col style={{ minWidth: 140 }} />
+          <col style={{ minWidth: 150 }} />
+          <col style={{ minWidth: 150 }} />
+          <col style={{ minWidth: 310 }} />
+        </colgroup>
         <thead>
-          <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3 first:rounded-l-2xl">#</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">Mã đơn</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">Khách hàng</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">SĐT</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">Tour</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">Khởi hành</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">Khách</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3 text-right last:rounded-r-2xl">Tổng</th>
-            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-5 py-3">Trạng thái</th>
+          <tr className="text-left text-[11px] 2xl:text-xs font-black uppercase tracking-wider text-slate-500">
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3 first:rounded-l-2xl">#</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3">Mã đơn</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3">Khách hàng</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3">SĐT</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3">Tour</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3">Khởi hành</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3">Khách</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3 text-right">Tổng</th>
+            <th className="whitespace-nowrap border-y border-slate-100 bg-slate-50/60 px-6 py-3 last:rounded-r-2xl">Trạng thái</th>
           </tr>
         </thead>
         <tbody>
           {items.map((b, i) => (
             <tr key={b.id} className="align-middle hover:bg-slate-50/70">
-              <td className="whitespace-nowrap border-b border-slate-100 px-5 py-3 font-mono text-xs text-slate-400">
+              <td className="whitespace-nowrap border-b border-slate-100 px-6 py-4 font-mono text-xs text-slate-400">
                 {String(i + 1).padStart(2, '0')}
               </td>
-              <td className="whitespace-nowrap border-b border-slate-100 px-5 py-3">
-                <div className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-2.5 py-1 ring-1 ring-inset ring-blue-100">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  <span className="font-mono text-[11px] font-black tracking-wide text-blue-700">{b.code}</span>
+              <td className="whitespace-nowrap border-b border-slate-100 px-6 py-4">
+                <div className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 ring-1 ring-inset ring-blue-100">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="font-mono text-xs font-black tracking-wide text-blue-700">{b.code}</span>
                 </div>
               </td>
-              <td className="border-b border-slate-100 px-5 py-3">
-                <div className="flex items-center gap-2.5">
+              <td className="border-b border-slate-100 px-6 py-4">
+                <div className="flex items-center gap-3">
                   <div className="relative">
                     <div
                       className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-full text-xs font-black text-white ring-2 ring-white shadow-sm',
+                        'flex h-11 w-11 items-center justify-center rounded-full text-xs font-black text-white ring-2 ring-white shadow-sm',
                         i % 4 === 0
                           ? 'bg-gradient-to-br from-blue-500 to-blue-700'
                           : i % 4 === 1
@@ -402,31 +420,31 @@ export function RecentBookingsTable({ items }: { items: Booking[] }) {
                     >
                       {(b.contact.name || '?').trim().slice(0, 1).toUpperCase()}
                     </div>
-                    <span className={cn('absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white', dots[b.status])} />
+                    <span className={cn('absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-white', dots[b.status])} />
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-slate-800">{b.contact.name}</div>
-                    <div className="truncate text-[11px] text-slate-500">{b.contact.email || '—'}</div>
+                    <div className="truncate text-[15px] font-bold text-slate-800">{b.contact.name}</div>
+                    <div className="truncate text-xs text-slate-500">{b.contact.email || '—'}</div>
                   </div>
                 </div>
               </td>
-              <td className="whitespace-nowrap border-b border-slate-100 px-5 py-3 text-slate-600">{b.contact.phone}</td>
-              <td className="border-b border-slate-100 px-5 py-3">
-                <div className="truncate font-semibold text-slate-800">{b.tour.title}</div>
-                <div className="truncate text-[11px] text-slate-500">{b.tour.code || '—'}</div>
+              <td className="whitespace-nowrap border-b border-slate-100 px-6 py-4 text-slate-600">{b.contact.phone}</td>
+              <td className="border-b border-slate-100 px-6 py-4">
+                <div className="truncate text-[15px] font-bold text-slate-800">{b.tour.title}</div>
+                <div className="truncate text-xs text-slate-500">{b.tour.code || '—'}</div>
               </td>
-              <td className="whitespace-nowrap border-b border-slate-100 px-5 py-3 text-slate-600">
+              <td className="whitespace-nowrap border-b border-slate-100 px-6 py-4 text-slate-600">
                 {b.departureStandardText || formatDate(b.departureDate)}
               </td>
-              <td className="whitespace-nowrap border-b border-slate-100 px-5 py-3 text-xs text-slate-600">
-                {b.adultCount ? <span className="mr-1.5 rounded-md bg-slate-100 px-1.5 py-0.5 font-bold">NL {b.adultCount}</span> : null}
-                {b.childCount ? <span className="mr-1.5 rounded-md bg-orange-50 px-1.5 py-0.5 font-bold text-orange-700">TE {b.childCount}</span> : null}
-                {b.infantCount ? <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-bold text-emerald-700">EB {b.infantCount}</span> : null}
+              <td className="whitespace-nowrap border-b border-slate-100 px-6 py-4 text-xs text-slate-600">
+                {b.adultCount ? <span className="mr-2 rounded-md bg-slate-100 px-2 py-1 font-bold">NL {b.adultCount}</span> : null}
+                {b.childCount ? <span className="mr-2 rounded-md bg-orange-50 px-2 py-1 font-bold text-orange-700">TE {b.childCount}</span> : null}
+                {b.infantCount ? <span className="rounded-md bg-emerald-50 px-2 py-1 font-bold text-emerald-700">EB {b.infantCount}</span> : null}
               </td>
-              <td className="whitespace-nowrap border-b border-slate-100 px-5 py-3 text-right font-black text-orange-600">
+              <td className="whitespace-nowrap border-b border-slate-100 px-6 py-4 text-right font-black text-orange-600 tabular-nums text-[15px] 2xl:text-base">
                 {formatMoney(b.totalAmount)}
               </td>
-              <td className="border-b border-slate-100 px-5 py-3">
+              <td className="border-b border-slate-100 px-6 py-4">
                 <BookingStatusBadge status={b.status} paymentStatus={b.paymentStatus} />
               </td>
             </tr>

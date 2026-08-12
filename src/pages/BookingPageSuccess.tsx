@@ -76,21 +76,21 @@ export function BookingPageSuccess({ code, tour }: { code: string; tour: PublicT
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Link
               to={tour ? `/tours/${tour.slug}` : '/tours'}
-              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-6 text-sm font-extrabold uppercase text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-6 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50"
             >
               ← Quay lại tour
             </Link>
             {auth.isLoggedIn ? (
               <Link
                 to="/account/bookings"
-                className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-emerald-700 px-6 text-sm font-extrabold uppercase text-white shadow-sm shadow-emerald-700/20 hover:bg-emerald-800"
+                className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-emerald-700 px-6 text-xs font-extrabold uppercase text-white shadow-sm shadow-emerald-700/20 hover:bg-emerald-800"
               >
                 🧾 Xem đơn của tôi
               </Link>
             ) : (
               <Link
                 to="/auth/login"
-                className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-slate-900 px-6 text-sm font-extrabold uppercase text-white shadow-sm hover:bg-slate-800"
+                className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-slate-900 px-6 text-xs font-extrabold uppercase text-white shadow-sm hover:bg-slate-800"
               >
                 🔑 Đăng nhập để xem đơn
               </Link>

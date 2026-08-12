@@ -237,9 +237,6 @@ const REPORTS_TABS: Array<{ key: ReportTabKey; label: string; icon: 'banknote' |
 const TOUR_TYPE_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'all', label: 'Tất cả loại tour' },
   { key: 'Trong nước', label: 'Trong nước' },
-  { key: 'Nước ngoài', label: 'Nước ngoài' },
-  { key: 'Đoàn riêng / MICE', label: 'Đoàn riêng / MICE' },
-  { key: 'Tour xe / Đường bộ', label: 'Tour xe / Đường bộ' },
 ]
 
 const STATUS_CHIP: Record<OutstandingRow['status'], { label: string; cls: string }> = {
@@ -375,20 +372,32 @@ function OutstandingTable({ rows }: { rows: OutstandingRow[] }) {
     )
   }
   return (
-    <div className="-mx-5 overflow-x-auto px-5">
-      <table className="min-w-full border-separate border-spacing-0 text-sm">
+    <div className="-mx-5 -my-1 overflow-x-auto px-5 py-1">
+      <table className="min-w-full w-full border-separate border-spacing-0 text-sm">
+        <colgroup>
+          <col style={{ minWidth: 150 }} />
+          <col style={{ minWidth: 200 }} />
+          <col style={{ minWidth: 340 }} />
+          <col style={{ minWidth: 120 }} />
+          <col style={{ minWidth: 140 }} />
+          <col style={{ minWidth: 140 }} />
+          <col style={{ minWidth: 150 }} />
+          <col style={{ minWidth: 130 }} />
+          <col style={{ minWidth: 145 }} />
+          <col style={{ minWidth: 120 }} />
+        </colgroup>
         <thead>
-          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <th className="px-3 py-2">Mã đơn</th>
-            <th className="px-3 py-2">Khách hàng</th>
-            <th className="px-3 py-2">Tour</th>
-            <th className="px-3 py-2">Khởi hành</th>
-            <th className="px-3 py-2">Tổng tiền</th>
-            <th className="px-3 py-2">Đã thu</th>
-            <th className="px-3 py-2">Còn nợ</th>
-            <th className="px-3 py-2">TT đơn</th>
-            <th className="px-3 py-2">Thanh toán</th>
-            <th className="px-3 py-2">Quá hạn</th>
+          <tr className="text-left text-[11px] 2xl:text-xs font-black uppercase tracking-wider text-slate-500">
+            <th className="px-4 py-3">Mã đơn</th>
+            <th className="px-4 py-3">Khách hàng</th>
+            <th className="px-4 py-3">Tour</th>
+            <th className="px-4 py-3">Khởi hành</th>
+            <th className="px-4 py-3 text-right">Tổng tiền</th>
+            <th className="px-4 py-3 text-right">Đã thu</th>
+            <th className="px-4 py-3 text-right">Còn nợ</th>
+            <th className="px-4 py-3">TT đơn</th>
+            <th className="px-4 py-3">Thanh toán</th>
+            <th className="px-4 py-3">Quá hạn</th>
           </tr>
         </thead>
         <tbody>
@@ -396,32 +405,32 @@ function OutstandingTable({ rows }: { rows: OutstandingRow[] }) {
             const status = STATUS_CHIP[r.status]
             const pmt = PMT_CHIP[r.paymentStatus]
             return (
-              <tr key={r.id} className="group hover:bg-orange-50/40">
-                <td className="px-3 py-2 font-mono text-xs font-bold text-blue-700">{r.code}</td>
-                <td className="px-3 py-2">
-                  <div className="font-semibold text-slate-900">{r.customer.name}</div>
-                  <div className="text-xs text-slate-500">{r.customer.phone}</div>
+              <tr key={r.id} className="group hover:bg-orange-50/50">
+                <td className="px-4 py-3 font-mono text-[12px] 2xl:text-xs font-bold text-blue-700 whitespace-nowrap">{r.code}</td>
+                <td className="px-4 py-3">
+                  <div className="font-semibold text-slate-900 text-sm 2xl:text-[15px]">{r.customer.name}</div>
+                  <div className="text-xs 2xl:text-[13px] text-slate-500">{r.customer.phone}</div>
                 </td>
-                <td className="px-3 py-2 min-w-[220px]">
-                  <div className="font-medium text-slate-800 line-clamp-1">{r.tour.title}</div>
-                  {r.tour.code ? <div className="text-xs text-slate-500 font-mono">{r.tour.code}</div> : null}
+                <td className="px-4 py-3 min-w-[340px]">
+                  <div className="font-medium text-slate-800 text-sm 2xl:text-[15px] line-clamp-1">{r.tour.title}</div>
+                  {r.tour.code ? <div className="text-[12px] 2xl:text-xs text-slate-500 font-mono mt-1">{r.tour.code}</div> : null}
                 </td>
-                <td className="px-3 py-2 text-slate-700">{formatDate(r.departureDate)}</td>
-                <td className="px-3 py-2 font-semibold text-slate-900">{formatMoney(r.totalAmount)}</td>
-                <td className="px-3 py-2 font-medium text-emerald-700">{formatMoney(r.paidAmount)}</td>
-                <td className="px-3 py-2">
-                  <span className="font-extrabold text-rose-700">{formatMoney(r.outstandingAmount)}</span>
+                <td className="px-4 py-3 text-slate-700 text-sm 2xl:text-[15px] whitespace-nowrap">{formatDate(r.departureDate)}</td>
+                <td className="px-4 py-3 font-bold text-slate-900 text-sm 2xl:text-[15px] text-right whitespace-nowrap tabular-nums">{formatMoney(r.totalAmount)}</td>
+                <td className="px-4 py-3 font-semibold text-emerald-700 text-sm 2xl:text-[15px] text-right whitespace-nowrap tabular-nums">{formatMoney(r.paidAmount)}</td>
+                <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+                  <span className="font-extrabold text-rose-700 text-[15px] 2xl:text-base">{formatMoney(r.outstandingAmount)}</span>
                 </td>
-                <td className="px-3 py-2">
-                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', status.cls)}>{status.label}</span>
+                <td className="px-4 py-3">
+                  <span className={cn('inline-flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs 2xl:text-[13px] font-bold ring-1', status.cls)}>{status.label}</span>
                 </td>
-                <td className="px-3 py-2">
-                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', pmt.cls)}>{pmt.label}</span>
+                <td className="px-4 py-3">
+                  <span className={cn('inline-flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs 2xl:text-[13px] font-bold ring-1', pmt.cls)}>{pmt.label}</span>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-4 py-3">
                   {r.overdueDays > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200">
-                      <TriangleAlert size={12} /> {r.overdueDays} ngày
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-rose-100 px-3 py-1.5 text-xs 2xl:text-[13px] font-black text-rose-700 ring-1 ring-rose-200">
+                      <TriangleAlert size={14} /> {r.overdueDays} ngày
                     </span>
                   ) : (
                     <span className="text-xs text-slate-400">—</span>
@@ -436,124 +445,65 @@ function OutstandingTable({ rows }: { rows: OutstandingRow[] }) {
   )
 }
 
-function buildDemoFinancialReport(preset: FinancialReportPeriodPreset, fromISO: string, toISO: string): FinancialReport {
-  const linePoints =
-    preset === 'year' || preset === 'quarter'
-      ? Array.from({ length: 12 }, (_, i) => ({
-          key: `m${i}`,
-          label: `T${String(i + 1).padStart(2, '0')}`,
-          value: [38, 46, 52, 78, 92, 118, 148, 156, 132, 104, 84, 66][i] || 0,
-        }))
-      : Array.from({ length: 7 }, (_, i) => ({
-          key: `d${i}`,
-          label: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'][i],
-          value: [42, 58, 74, 62, 96, 148, 124][i] || 0,
-        }))
+function buildEmptyFinancialReport(preset: FinancialReportPeriodPreset, fromISO: string, toISO: string): FinancialReport {
   return {
     period: { preset, fromISO, toISO },
     kpis: {
-      bookingCountAll: 268,
-      bookingCountCompleted: 230,
-      bookingCountCancelled: 18,
-      grossRevenue: 2_880_000_000,
-      discountTotalEstimated: 86_000_000,
-      netRevenue: 2_794_000_000,
-      paidTotal: 2_235_000_000,
-      partialPaidTotal: 312_000_000,
-      unpaidTotal: 247_000_000,
-      outstandingTotal: 559_000_000,
-      passengerTotal: 986,
-      passengerAdult: 723,
-      passengerChild: 214,
-      passengerInfant: 49,
-      aovCompleted: 12_147_826,
-      cancellationRate: 6.72,
-      topTour: { tourId: 'demo', title: 'Phú Quốc 5N4Đ - Vinpearl Safari', tourCode: 'T-PQ5-05', revenue: 428_000_000 },
-      overdueOutstandingTotal: 320_000_000,
-      overdueCount: 12,
-      paymentCompletionRate: 79.98,
+      bookingCountAll: 0,
+      bookingCountCompleted: 0,
+      bookingCountCancelled: 0,
+      grossRevenue: 0,
+      discountTotalEstimated: 0,
+      netRevenue: 0,
+      paidTotal: 0,
+      partialPaidTotal: 0,
+      unpaidTotal: 0,
+      outstandingTotal: 0,
+      passengerTotal: 0,
+      passengerAdult: 0,
+      passengerChild: 0,
+      passengerInfant: 0,
+      aovCompleted: 0,
+      cancellationRate: 0,
+      topTour: null,
+      overdueOutstandingTotal: 0,
+      overdueCount: 0,
+      paymentCompletionRate: 0,
     },
-    revenueLine: linePoints,
-    tourTypeSlices: [
-      { label: 'Trong nước', value: 1_620_000_000, color: '#2563eb' },
-      { label: 'Nước ngoài', value: 796_000_000, color: '#f97316' },
-      { label: 'Đoàn riêng / MICE', value: 268_000_000, color: '#0ea5e9' },
-      { label: 'Tour xe / Đường bộ', value: 110_000_000, color: '#10b981' },
-    ],
-    paymentMethodSlices: [
-      { label: 'Chuyển khoản ngân hàng', value: 1_942_000_000, color: '#2563eb' },
-      { label: 'Thanh toán online (VNPay/MoMo)', value: 669_000_000, color: '#10b981' },
-      { label: 'Giữ chỗ / Tiền mặt tại VP', value: 183_000_000, color: '#f97316' },
-    ],
-    regionRevenueBars: [
-      { label: 'Miền Bắc', value: 984_000_000, color: '#2563eb' },
-      { label: 'Miền Nam', value: 846_000_000, color: '#f97316' },
-      { label: 'Quốc tế', value: 560_000_000, color: '#8b5cf6' },
-      { label: 'Miền Trung', value: 404_000_000, color: '#10b981' },
-    ],
-    monthly: Array.from({ length: 12 }, (_, i) => {
-      const rev = [162, 148, 186, 224, 268, 312, 356, 392, 326, 268, 218, 186][i] * 1_000_000
-      const count = Math.round(rev / 10_500_000)
-      const cancelled = Math.round(count * (5 + (i % 5) * 0.6) / 100)
-      return {
-        key: `2026-${String(i + 1).padStart(2, '0')}`,
-        label: `T${String(i + 1).padStart(2, '0')}/2026`,
-        bookingCount: count,
-        completedCount: Math.max(0, count - cancelled),
-        cancelledCount: cancelled,
-        revenue: rev,
-        passengerTotal: Math.round(count * 3.6),
-        aov: 10_500_000,
-        cancellationRate: count === 0 ? 0 : (cancelled / count) * 100,
-      }
-    }),
-    outstanding: [
-      {
-        id: 'd1',
-        code: 'BK-VNEX-24080014',
-        customer: { name: 'Nguyễn Thị Minh Anh', phone: '0912 345 678', email: 'anh@example.com' },
-        tour: { title: 'Hà Giang Loop 4N3Đ - Mùa lúa chín', code: 'T-HG4-03' },
-        departureDate: '2026-08-14',
-        createdAt: '2026-07-20T10:20:00.000Z',
-        totalAmount: 18_600_000,
-        paidAmount: 0,
-        outstandingAmount: 18_600_000,
-        status: 'confirmed',
-        paymentStatus: 'unpaid',
-        holdsUntil: '2026-07-27T09:00:00.000Z',
-        overdueDays: 11,
-      },
-      {
-        id: 'd2',
-        code: 'BK-VNEX-24080021',
-        customer: { name: 'Trần Văn Hoàng', phone: '0934 987 654', email: null },
-        tour: { title: 'Phú Quốc 5N4Đ - Khu nghỉ dưỡng Sang trọng', code: 'T-PQ5-05' },
-        departureDate: '2026-08-16',
-        createdAt: '2026-07-15T08:00:00.000Z',
-        totalAmount: 76_400_000,
-        paidAmount: 38_200_000,
-        outstandingAmount: 38_200_000,
-        status: 'confirmed',
-        paymentStatus: 'partial',
-        holdsUntil: '2026-07-30T09:00:00.000Z',
-        overdueDays: 8,
-      },
-      {
-        id: 'd3',
-        code: 'BK-VNEX-24070113',
-        customer: { name: 'Công ty TNHH Hữu Phát', phone: '024 3567 1234', email: 'huuphat@corp.vn' },
-        tour: { title: 'Tour MICE - Hội nghị Khách sạn InterContinental Đà Nẵng 3N2Đ', code: 'T-DN3-08-M' },
-        departureDate: '2026-08-10',
-        createdAt: '2026-06-18T10:00:00.000Z',
-        totalAmount: 268_800_000,
-        paidAmount: 134_400_000,
-        outstandingAmount: 134_400_000,
-        status: 'pending',
-        paymentStatus: 'partial',
-        holdsUntil: '2026-08-01T09:00:00.000Z',
-        overdueDays: 6,
-      },
-    ],
+    revenueLine: Array.from({ length: 7 }, (_, i) => ({
+      key: `d${i}`,
+      label: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'][i] ?? `N${i}`,
+      value: 0,
+    })),
+    tourTypeSlices: [],
+    paymentMethodSlices: [],
+    regionRevenueBars: [],
+    monthly: [],
+    outstanding: [],
+  }
+}
+
+function buildEmptyBookingsReport(preset: ReportBookingsPeriodPreset, fromISO: string, toISO: string, page: number, pageSize: number): ReportBookingsResponse {
+  return {
+    period: { preset, fromISO, toISO },
+    summary: {
+      bookingCountAll: 0,
+      totalAmount: 0,
+      paidAmount: 0,
+      outstandingAmount: 0,
+      overdueAmount: 0,
+      completedCount: 0,
+      cancelledCount: 0,
+      passengerTotal: 0,
+    },
+    groupRows: [],
+    groupKey: 'none',
+    rows: [],
+    page,
+    pageSize,
+    totalRows: 0,
+    totalPages: 1,
+    sort: 'createdAt_desc',
   }
 }
 
@@ -563,7 +513,7 @@ export default function AdminReportsPage() {
   const { fromISO: fromISOInit, toISO: toISOInit } = useMemo(() => presetMonth(), [])
   const [fromISO, setFromISO] = useState<string>(fromISOInit)
   const [toISO, setToISO] = useState<string>(toISOInit)
-  const [tourType, setTourType] = useState<string>('all')
+  const [tourType, setTourType] = useState<string>('Trong nước')
   const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<FinancialReport | null>(null)
@@ -586,7 +536,7 @@ export default function AdminReportsPage() {
   const [bPaymentStatuses, setBPaymentStatuses] = useState<BookingPaymentStatus[]>([])
   const [bPassengerTypes, setBPassengerTypes] = useState<Array<'NL' | 'TE' | 'EB'>>([])
   const [bPaymentMethods, setBPaymentMethods] = useState<BookingPaymentMethod[]>([])
-  const [bTourCategory, setBTourCategory] = useState<string>('all')
+  const [bTourCategory, setBTourCategory] = useState<string>('Trong nước')
   const [bDepartureFrom, setBDepartureFrom] = useState<string>('')
   const [bDepartureTo, setBDepartureTo] = useState<string>('')
   const [bMinAmount, setBMinAmount] = useState<string>('')
@@ -599,15 +549,15 @@ export default function AdminReportsPage() {
   const [bSelectedIds, setBSelectedIds] = useState<Set<string>>(new Set())
   const [bShowAllSelect, setBShowAllSelect] = useState(false)
 
-  const demo = useMemo(() => {
+  const fallback = useMemo(() => {
     const p = preset === 'custom' ? 'month' : preset
-    return buildDemoFinancialReport(p, fromISO || fromISOInit, toISO || toISOInit)
+    return buildEmptyFinancialReport(p, fromISO || fromISOInit, toISO || toISOInit)
   }, [preset, fromISO, toISO, fromISOInit, toISOInit])
 
   const used: FinancialReport = useMemo(() => {
-    if (data && (data.monthly.length > 0 || data.revenueLine.some((x) => x.value > 0))) return data
-    return demo
-  }, [data, demo])
+    if (data) return data
+    return fallback
+  }, [data, fallback])
 
   const load = async () => {
     const nonce = (nonceRef.current += 1)
@@ -728,14 +678,14 @@ export default function AdminReportsPage() {
     if (error) {
       return (
         <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-200">
-          <TriangleAlert size={14} /> Lỗi kết nối API - đang hiển thị mẫu
+          <TriangleAlert size={14} /> Lỗi kết nối API (nhấn Làm mới để thử lại)
         </span>
       )
     }
     if (!data || (data.monthly.length === 0 && data.revenueLine.every((x) => x.value === 0))) {
       return (
-        <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
-          <Sparkles size={14} /> DB chưa có đơn - đang hiển thị mẫu tham khảo
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+          Chưa có đơn trong kỳ
         </span>
       )
     }
@@ -1480,98 +1430,6 @@ function ChipToggle({ active, onClick, children }: { active: boolean; onClick: (
   )
 }
 
-function buildDemoBookingsReport(preset: ReportBookingsPeriodPreset, fromISO: string, toISO: string, page: number, pageSize: number): ReportBookingsResponse {
-  const rows: ReportBookingsRow[] = Array.from({ length: 68 }, (_, i) => {
-    const createdAt = new Date(new Date(toISO).getTime() - i * 86_400_000 * 1.4)
-    const departureDate = new Date(createdAt.getTime() + (10 + (i % 22)) * 86_400_000)
-    const tours = [
-      { title: 'Hà Nội - Hạ Long 2N1Đ Luxury Cruise', code: 'T-HL2-01', cat: 'Trong nước', region: 'Bắc' },
-      { title: 'Hà Giang Loop 4N3Đ - Mùa lúa chín', code: 'T-HG4-03', cat: 'Trong nước', region: 'Bắc' },
-      { title: 'Đà Nẵng - Hội An - Huế 5N4Đ Voucher Vinpearl', code: 'T-DN5-01', cat: 'Trong nước', region: 'Trung' },
-      { title: 'Phú Quốc 5N4Đ - Khu nghỉ dưỡng Sang trọng', code: 'T-PQ5-05', cat: 'Nước ngoài' as any, region: 'Nam' },
-      { title: 'Thái Lan Bangkok Pattaya 5N4Đ', code: 'T-TL5-08', cat: 'Nước ngoài', region: 'Quốc tế' },
-      { title: 'Tour MICE - Hội nghị InterContinental Đà Nẵng 3N2Đ', code: 'T-DN3-08-M', cat: 'Đoàn riêng / MICE', region: 'Trung' },
-    ]
-    const tr = tours[i % tours.length]
-    const status = (['new', 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled'] as BookingStatus[])[i % 6]
-    const pst = (['unpaid', 'partial', 'paid'] as BookingPaymentStatus[])[i % 3]
-    const pmt = (['bank_transfer', 'online', 'hold'] as BookingPaymentMethod[])[i % 3]
-    const nl = 2 + (i % 5)
-    const te = i % 4
-    const eb = i % 2
-    const base = 4_800_000 + (i % 18) * 1_200_000
-    const totalAmount = nl * base + te * (base * 0.75) + eb * (base * 0.1)
-    const paid = pst === 'paid' ? totalAmount : pst === 'partial' ? Math.round(totalAmount * 0.5) : 0
-    return {
-      id: `demo-${i}`,
-      code: `BK-DEMO-${String(2600 + i).padStart(5, '0')}`,
-      customerName: [
-        'Nguyễn Thị Minh Anh', 'Trần Văn Hoàng', 'Công ty TNHH Hữu Phát',
-        'Lê Thị Lan Anh', 'Phạm Đức Long', 'Hoàng Thị Mai', 'Vũ Thị Kim Oanh',
-      ][i % 7],
-      customerPhone: `0${String(900 + i * 37).slice(0, 3)} ${String(1000 + i * 37).slice(0, 4)} ${String(2000 + i * 13).slice(0, 4)}`,
-      customerEmail: i % 3 === 0 ? `customer${i}@example.com` : null,
-      passengerCount: nl + te + eb,
-      passengerAdult: nl,
-      passengerChild: te,
-      passengerInfant: eb,
-      tourId: `t-${i % 6}`,
-      tourCode: tr.code,
-      tourTitle: tr.title,
-      tourTypeCategory: tr.cat as any,
-      region: tr.region,
-      departureDateISO: toISO2(departureDate),
-      createdAtISO: toISO2(createdAt),
-      createdByStaffId: `u-${i % 4}`,
-      createdByStaffName: ['Châu Thị Thu (Admin)', 'Nguyễn Hùng (Sale01)', 'Lê Lan (Sale02)', 'Hoàng Mai (Sale03)'][i % 4],
-      status,
-      paymentStatus: pst,
-      paymentMethod: pmt,
-      subtotalAmount: Math.round(totalAmount * 0.9),
-      surchargeAmount: Math.round(totalAmount * 0.03),
-      vatAmount: Math.round(totalAmount * 0.07),
-      totalAmount: Math.round(totalAmount),
-      paidAmount: Math.round(paid),
-      outstandingAmount: Math.max(0, Math.round(totalAmount - paid)),
-      holdsUntilISO: pst === 'unpaid' || pst === 'partial' ? toISO2(new Date(createdAt.getTime() + 5 * 86_400_000)) : null,
-      overdueDays: (pst !== 'paid' && i % 5 === 0) ? (i % 8) + 1 : 0,
-      notes: i % 3 === 0 ? 'Gọi xác nhận khách vào chiều thứ 6' : null,
-    }
-  })
-  const totalRows = rows.length
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
-  const start = Math.max(0, (page - 1) * pageSize)
-  const pageRows = rows.slice(start, start + pageSize)
-  const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
-  return {
-    period: { preset, fromISO, toISO },
-    summary: {
-      bookingCountAll: rows.length,
-      totalAmount: sum(rows.map((r) => r.totalAmount)),
-      paidAmount: sum(rows.map((r) => r.paidAmount)),
-      outstandingAmount: sum(rows.map((r) => r.outstandingAmount)),
-      overdueAmount: sum(rows.filter((r) => r.overdueDays > 0).map((r) => r.outstandingAmount)),
-      completedCount: rows.filter((r) => r.status === 'completed').length,
-      cancelledCount: rows.filter((r) => r.status === 'cancelled').length,
-      passengerTotal: sum(rows.map((r) => r.passengerCount)),
-    },
-    groupRows: [],
-    groupKey: 'none',
-    rows: pageRows,
-    page,
-    pageSize,
-    totalRows,
-    totalPages,
-    sort: 'createdAt_desc',
-  }
-}
-function toISO2(d: Date) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${dd}`
-}
-
 type BookingsTabProps = {
   initialLoading: boolean
   stale: boolean
@@ -1623,70 +1481,18 @@ type BookingsTabProps = {
 
 function AdminBookingsReportTab(p: BookingsTabProps) {
   const isLoading = p.initialLoading || p.stale
-  const demo = useMemo(() => buildDemoBookingsReport(p.preset, p.fromISO, p.toISO, p.page, p.pageSize), [p.preset, p.fromISO, p.toISO, p.page, p.pageSize])
+  const fallback = useMemo(() => buildEmptyBookingsReport(p.preset, p.fromISO, p.toISO, p.page, p.pageSize), [p.preset, p.fromISO, p.toISO, p.page, p.pageSize])
   const used = useMemo<ReportBookingsResponse>(() => {
-    if (p.data && (p.data.totalRows > 0 || p.data.rows.length > 0)) return p.data
-    // if group request, apply grouping on demo too for preview
-    if (p.groupBy !== 'none' && demo.rows.length > 0) {
-      const allRows = buildDemoBookingsReport(p.preset, p.fromISO, p.toISO, 1, 99999).rows
-      const gmap = new Map<string, any>()
-      for (const r of allRows) {
-        let key: string, label: string
-        switch (p.groupBy) {
-          case 'month_created': {
-            const d = new Date(r.createdAtISO)
-            key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-            label = `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`
-            break
-          }
-          case 'staff_created':
-            key = r.createdByStaffId || 'none'
-            label = r.createdByStaffName || 'Không xác định'
-            break
-          case 'tour_type':
-            key = r.tourTypeCategory
-            label = r.tourTypeCategory
-            break
-          case 'region':
-            key = r.region
-            label = r.region
-            break
-          case 'status':
-            key = r.status
-            label = BOOKING_STATUS_META[r.status].label
-            break
-          case 'payment_status':
-            key = r.paymentStatus
-            label = PAYMENT_STATUS_META[r.paymentStatus].label
-            break
-          default:
-            key = 'all'
-            label = 'Tất cả'
-        }
-        const cur = gmap.get(key) || {
-          key, label, bookingCount: 0, passengerTotal: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0, aov: 0, completedCount: 0, cancelledCount: 0,
-        }
-        cur.bookingCount += 1
-        cur.passengerTotal += r.passengerCount
-        cur.totalAmount += r.totalAmount
-        cur.paidAmount += r.paidAmount
-        cur.outstandingAmount += r.outstandingAmount
-        if (r.status === 'completed') cur.completedCount += 1
-        if (r.status === 'cancelled') cur.cancelledCount += 1
-        gmap.set(key, cur)
-      }
-      const groupRows = Array.from(gmap.values()).sort((a, b) => b.totalAmount - a.totalAmount).map((g) => ({ ...g, aov: g.bookingCount === 0 ? 0 : g.totalAmount / g.bookingCount }))
-      return { ...demo, groupRows, groupKey: p.groupBy }
-    }
-    return demo
-  }, [p.data, p.groupBy, p.preset, p.fromISO, p.toISO, p.page, p.pageSize])
+    if (p.data) return p.data
+    return fallback
+  }, [p.data, fallback])
   const s = used.summary
 
   const dataStateBadge = useMemo(() => {
     if (p.initialLoading) return (<span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-200"><RefreshCcw size={14} className="animate-spin" /> Đang tải bookings…</span>)
     if (p.stale) return (<span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200"><RefreshCcw size={14} className="animate-spin" /> Đang cập nhật bộ lọc…</span>)
-    if (p.error) return (<span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-200"><TriangleAlert size={14} /> Lỗi API - đang hiển thị mẫu</span>)
-    if (!p.data || p.data.totalRows === 0) return (<span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200"><Sparkles size={14} /> DB rỗng / không khớp bộ lọc - mẫu tham khảo</span>)
+    if (p.error) return (<span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-200"><TriangleAlert size={14} /> Lỗi API (nhấn Làm mới để thử lại)</span>)
+    if (!p.data || p.data.totalRows === 0) return (<span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">Không có đơn khớp bộ lọc</span>)
     return (<span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"><CheckCircle2 size={14} /> {formatInt(p.data.totalRows)} đơn thực tế</span>)
   }, [p.initialLoading, p.stale, p.error, p.data])
 

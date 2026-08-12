@@ -16,7 +16,7 @@ const listUsersQuery = z.object({
   role: z.preprocess(emptyToUndefined, z.enum(['customer', 'staff', 'admin'])).optional(),
   isActive: z.preprocess(emptyToUndefined, z.enum(['true', 'false'])).optional(),
   page: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1)).optional(),
-  limit: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(100)).optional(),
+  limit: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(500)).optional(),
 })
 
 const createUserDto = z.object({

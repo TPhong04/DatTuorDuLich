@@ -265,7 +265,7 @@ export default function GroupTourRequestPage() {
               <li className="flex gap-2">✅ Miễn phí đổi danh sách hành khách 5 ngày trước khởi hành</li>
               <li className="flex gap-2">✅ Cân bằng thanh toán trả chậm 30 ngày (HĐ doanh nghiệp)</li>
             </ul>
-            <button disabled={submitting} type="submit" className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white px-6 text-sm font-black uppercase text-blue-900 shadow-lg hover:bg-orange-50 disabled:opacity-70">
+            <button disabled={submitting} type="submit" className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white px-6 text-xs font-black uppercase text-blue-900 shadow-lg hover:bg-orange-50 disabled:opacity-70">
               {submitting ? 'Đang gửi yêu cầu...' : '🚀 Gửi yêu cầu báo giá'}
             </button>
             <p className="mt-3 text-center text-[11px] text-white/70">Thông tin của bạn bảo mật 100%. Không chia sẻ ra bên ngoài.</p>
@@ -279,7 +279,7 @@ export default function GroupTourRequestPage() {
                 <div className="text-sm text-slate-500">Giờ hành chính 8h → 18h hàng ngày</div>
               </div>
             </div>
-            <a href="tel:19001009" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl border-2 border-orange-500 bg-orange-500 text-sm font-black uppercase text-white hover:bg-orange-600">📞 1900 1009</a>
+            <a href="tel:19001009" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl border-2 border-orange-500 bg-orange-500 text-xs font-black uppercase text-white hover:bg-orange-600">📞 1900 1009</a>
           </div>
         </div>
       </div>

@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Menu, Search, X } from 'lucide-react'
+import { Bell, ChevronDown, Menu, Search, X } from 'lucide-react'
 
 import logo from '@/assets/logo.png'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import { getStoredUser } from '@/features/auth/auth'
 import { getStoredAccessToken } from '@/features/auth/auth.storage'
 import { usePublicSettings } from '@/features/settings/SettingsProvider'
@@ -187,17 +188,20 @@ export default function Header() {
 
           <div className="hidden items-center gap-2 lg:flex">
             {authed ? (
-              <Link className="inline-flex items-center" to="/account">
-                <div className="relative h-10 w-10 overflow-hidden rounded-full ring-2 ring-orange-500">
-                  {user?.avatarUrl ? (
-                    <img alt="Ảnh đại diện" className="h-full w-full object-cover" src={user.avatarUrl} />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-700 to-blue-900 text-sm font-bold text-white">
-                      {initials}
-                    </div>
-                  )}
-                </div>
-              </Link>
+              <>
+                {user?.role === 'customer' && <NotificationBell />}
+                <Link className="inline-flex items-center" to="/account">
+                  <div className="relative h-10 w-10 overflow-hidden rounded-full ring-2 ring-orange-500">
+                    {user?.avatarUrl ? (
+                      <img alt="Ảnh đại diện" className="h-full w-full object-cover" src={user.avatarUrl} />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-700 to-blue-900 text-sm font-bold text-white">
+                        {initials}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              </>
             ) : (
               <NavLink
                 className={({ isActive }) =>
@@ -330,7 +334,14 @@ export default function Header() {
                     <div className="truncate text-xs text-slate-600">{user?.email ?? ''}</div>
                   </div>
                 </div>
-                <div className="text-sm font-semibold text-blue-800">Hồ sơ</div>
+                <div className="flex items-center gap-3">
+                  {user?.role === 'customer' && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <NotificationBell />
+                    </div>
+                  )}
+                  <div className="text-sm font-semibold text-blue-800">Hồ sơ</div>
+                </div>
               </Link>
             ) : (
               <div className="pt-2">

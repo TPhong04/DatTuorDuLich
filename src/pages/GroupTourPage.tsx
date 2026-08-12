@@ -47,7 +47,7 @@ export default function GroupTourPage() {
           <h2 className="mt-1 text-xl font-black text-slate-900">Mã yêu cầu: <span className="text-orange-600">{created}</span></h2>
           <p className="mt-1 text-sm text-slate-600">Chuyên viên Tour đoàn sẽ gọi điện xác nhận + báo giá chi tiết trong <span className="font-bold text-slate-900">30 phút tới</span> (giờ hành chính).</p>
         </div>
-        <Link to="/group-tour/request" className="inline-flex h-11 shrink-0 items-center rounded-2xl bg-emerald-600 px-5 text-sm font-black uppercase text-white hover:bg-emerald-700">Gửi thêm yêu cầu khác</Link>
+        <Link to="/group-tour/request" className="inline-flex h-11 shrink-0 items-center rounded-2xl bg-emerald-600 px-5 text-xs font-black uppercase text-white hover:bg-emerald-700">Gửi thêm yêu cầu khác</Link>
       </div>
     </div>
   ) : null, [created])
@@ -58,9 +58,9 @@ export default function GroupTourPage() {
         title="👔 Tour đoàn doanh nghiệp & nhóm lớn"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <a href="tel:19001009" className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">📞 1900 1009</a>
+            <a href="tel:19001009" className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50">📞 1900 1009</a>
             <Link
-              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-sm font-extrabold uppercase text-white shadow-sm shadow-orange-500/15 hover:opacity-95"
+              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/15 hover:opacity-95"
               to="/group-tour/request"
             >
               🚀 Gửi yêu cầu báo giá
@@ -81,10 +81,10 @@ export default function GroupTourPage() {
               Không cần nhập 100 tên ngay: chỉ cần <span className="font-black">Upload file Excel</span> hoặc gửi danh sách sau.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/group-tour/request" className="inline-flex h-12 items-center rounded-2xl bg-white px-8 text-sm font-black uppercase text-blue-900 hover:bg-orange-50 shadow-lg">
+              <Link to="/group-tour/request" className="inline-flex h-12 items-center rounded-2xl bg-white px-8 text-xs font-black uppercase text-blue-900 hover:bg-orange-50 shadow-lg">
                 Bắt đầu gửi yêu cầu →
               </Link>
-              <a href="tel:19001009" className="inline-flex h-12 items-center rounded-2xl border-2 border-white/40 bg-white/5 px-8 text-sm font-black uppercase text-white hover:bg-white/10">
+              <a href="tel:19001009" className="inline-flex h-12 items-center rounded-2xl border-2 border-white/40 bg-white/5 px-8 text-xs font-black uppercase text-white hover:bg-white/10">
                 📞 Tư vấn 1900 1009
               </a>
             </div>
@@ -149,7 +149,7 @@ export default function GroupTourPage() {
             <h3 className="mt-1 text-2xl font-black text-slate-900">6 lộ trình Tour đoàn phổ biến năm 2026</h3>
             <p className="mt-1 text-sm text-slate-500">Giá tham khảo cho đoàn 25+ người. Click gửi form để nhận báo giá chi tiết chính xác theo số lượng đoàn của bạn.</p>
           </div>
-          <Link to="/group-tour/request" className="inline-flex h-10 items-center rounded-2xl bg-slate-900 px-5 text-xs font-extrabold uppercase text-white hover:bg-slate-800">
+          <Link to="/group-tour/request" className="inline-flex h-10 items-center rounded-2xl bg-slate-900 px-5 text-[10px] font-extrabold uppercase text-white hover:bg-slate-800">
             Nhận báo giá riêng →
           </Link>
         </div>
@@ -176,7 +176,7 @@ export default function GroupTourPage() {
                     <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Giá tham khảo / người</div>
                     <div className="text-xl font-black text-orange-600">{formatMoney(t.perPerson)}đ</div>
                   </div>
-                  <Link to={`/group-tour/request?preset=${encodeURIComponent(t.title)}`} className="inline-flex h-10 items-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-4 text-xs font-black uppercase text-white hover:opacity-95">
+                  <Link to={`/group-tour/request?preset=${encodeURIComponent(t.title)}`} className="inline-flex h-10 items-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-4 text-[10px] font-black uppercase text-white hover:opacity-95">
                     Báo giá ngay
                   </Link>
                 </div>
@@ -207,7 +207,7 @@ export default function GroupTourPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-3xl backdrop-blur-sm">📞</div>
             <h3 className="mt-4 text-2xl font-black">Cần tư vấn ngay?</h3>
             <p className="mt-2 text-white/85">Gọi trực tiếp cho Chuyên viên Tour đoàn, được báo giá sơ bộ qua điện thoại 10 phút.</p>
-            <a href="tel:19001009" className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white px-6 text-sm font-black uppercase text-blue-900 shadow-lg hover:bg-orange-50">
+            <a href="tel:19001009" className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white px-6 text-xs font-black uppercase text-blue-900 shadow-lg hover:bg-orange-50">
               📞 Hotline: 1900 1009
             </a>
             <p className="mt-3 text-center text-[11px] text-white/70">8h00 → 20h00 | Tất cả các ngày trong tuần (kể cả thứ 7, Chủ Nhật)</p>
@@ -216,7 +216,7 @@ export default function GroupTourPage() {
             <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Hoặc gửi yêu cầu 2 phút</div>
             <h4 className="mt-1 text-lg font-black text-slate-900">Điền form & nhận báo giá chi tiết</h4>
             <p className="mt-1 text-sm text-slate-500">Bao gồm: giá từng hạng mục + hợp đồng mẫu + phương án thanh toán.</p>
-            <Link to="/group-tour/request" className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-6 text-sm font-black uppercase text-white hover:opacity-95">
+            <Link to="/group-tour/request" className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-6 text-xs font-black uppercase text-white hover:opacity-95">
               🚀 Bắt đầu gửi yêu cầu
             </Link>
           </div>

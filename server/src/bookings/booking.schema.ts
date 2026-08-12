@@ -168,6 +168,12 @@ export class Booking {
   @Prop({ type: Date, default: null })
   confirmedAt!: Date | null
 
+  @Prop({ type: [Types.ObjectId], default: [], index: true, ref: 'User' })
+  assignedStaffIds!: Types.ObjectId[]
+
+  @Prop({ type: Types.ObjectId, default: null, index: true, ref: 'User' })
+  updatedByStaffId!: Types.ObjectId | null
+
   createdAt!: Date
   updatedAt!: Date
 }

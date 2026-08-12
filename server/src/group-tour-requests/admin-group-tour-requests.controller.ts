@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { AccessTokenGuard } from '../auth/guards/access-token.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
-import { UserDocument } from '../users/user.schema'
+import { JwtPayload } from '../auth/auth.types'
 import { Types } from 'mongoose'
 import { GroupTourRequestsService } from './group-tour-requests.service'
 import { AdminPatchGroupTourRequestDTO, AdminPatchGroupTourRequestZod } from './dto'
@@ -33,7 +33,7 @@ export class AdminGroupTourRequestsController {
 
   @Get()
   async list(
-    @CurrentUser() u: UserDocument,
+    @CurrentUser() u: JwtPayload,
     @Query('status') status: GroupTourRequestStatus | undefined,
     @Query('priority') priority: 'low' | 'normal' | 'high' | 'urgent' | undefined,
     @Query('assignedStaffId') assignedStaffId: string | undefined,
@@ -43,7 +43,7 @@ export class AdminGroupTourRequestsController {
     @Query('pageSize') pageSize: string | undefined,
     @Query('sort') sort: 'newest' | 'oldest' | 'priority' | 'follow_up' | undefined,
   ) {
-    const actorId = new Types.ObjectId(u._id as any)
+    const actorId = new Types.ObjectId(u.sub)
     const res = await this.svc.list({
       status, priority, assignedStaffId,
       mine: mine === '1' || mine === 'true',
@@ -63,12 +63,12 @@ export class AdminGroupTourRequestsController {
 
   @Patch(':id')
   async patch(
-    @CurrentUser() u: UserDocument,
+    @CurrentUser() u: JwtPayload,
     @Param('id') id: string,
     @Body() body: AdminPatchGroupTourRequestDTO,
   ) {
     const data = this.parse(AdminPatchGroupTourRequestZod, body)
-    const actorId = new Types.ObjectId(u._id as any)
+    const actorId = new Types.ObjectId(u.sub)
     const actorRole: 'admin' | 'staff' = u.role === 'admin' ? 'admin' : 'staff'
     const row = await this.svc.patch(id, data, actorId, actorRole)
     return { ok: true, row }
@@ -88,16 +88,65 @@ export class AdminGroupTourRequestsController {
   }
 
   @Patch(':id/mark-contacted')
-  async markContacted(@CurrentUser() u: UserDocument, @Param('id') id: string) {
-    const actorId = new Types.ObjectId(u._id as any)
+  async markContacted(@CurrentUser() u: JwtPayload, @Param('id') id: string) {
+    const actorId = new Types.ObjectId(u.sub)
     const actorRole: 'admin' | 'staff' = u.role === 'admin' ? 'admin' : 'staff'
     const row = await this.svc.markContacted(id, actorId, actorRole)
     return { ok: true, row }
   }
 
+  @Patch(':id/mark-quoting')
+  async markQuoting(
+    @CurrentUser() u: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: { summary?: string; followUpDays?: number } | undefined,
+  ) {
+    const actorId = new Types.ObjectId(u.sub)
+    const actorRole: 'admin' | 'staff' = u.role === 'admin' ? 'admin' : 'staff'
+    const row = await this.svc.markQuoting(id, actorId, actorRole, body?.summary, body?.followUpDays ?? 1)
+    return { ok: true, row, message: 'Đã cập nhật Đã gửi báo giá, tăng counter quote +1.' }
+  }
+
+  @Patch(':id/mark-negotiating')
+  async markNegotiating(
+    @CurrentUser() u: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: { note?: string; followUpDays?: number } | undefined,
+  ) {
+    const actorId = new Types.ObjectId(u.sub)
+    const actorRole: 'admin' | 'staff' = u.role === 'admin' ? 'admin' : 'staff'
+    const row = await this.svc.markNegotiating(id, actorId, actorRole, body?.note, body?.followUpDays ?? 2)
+    return { ok: true, row, message: 'Đã chuyển trạng thái Đàm phán + followUp + 2 ngày.' }
+  }
+
+  @Patch(':id/mark-won')
+  async markWon(
+    @CurrentUser() u: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: { note?: string } | undefined,
+  ) {
+    const actorId = new Types.ObjectId(u.sub)
+    const actorRole: 'admin' | 'staff' = u.role === 'admin' ? 'admin' : 'staff'
+    const row = await this.svc.markWon(id, actorId, actorRole, body?.note)
+    return { ok: true, row, message: '🎉 Chốt đơn won thành công.' }
+  }
+
+  @Patch(':id/mark-lost')
+  async markLost(
+    @CurrentUser() u: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: { reason: string },
+  ) {
+    if (!body?.reason || String(body.reason).trim().length < 2) throw new BadRequestException('Cần nêu lý do thua đơn.')
+    const actorId = new Types.ObjectId(u.sub)
+    const actorRole: 'admin' | 'staff' = u.role === 'admin' ? 'admin' : 'staff'
+    const row = await this.svc.markLost(id, actorId, actorRole, String(body.reason).trim())
+    return { ok: true, row, message: 'Đã lưu lý do thua đơn.' }
+  }
+
   @Post('_dev/seed-samples')
-  async seedSamples(@CurrentUser() u: UserDocument) {
-    const check = await this.svc.list({ page: 1, pageSize: 1 }, new Types.ObjectId(u._id as any))
+  async seedSamples(@CurrentUser() u: JwtPayload) {
+    const check = await this.svc.list({ page: 1, pageSize: 1 }, new Types.ObjectId(u.sub))
     if (check.total >= 5) return { ok: true, skipped: true, message: 'Đã có >= 5 yêu cầu, bỏ qua tạo mẫu (có thể xóa dữ liệu cũ trước khi tạo lại).', total: check.total }
     const staffRes = await this.users.adminListUsers({ role: 'staff', isActive: true, limit: 100, page: 1 })
     const staffList = staffRes.items
@@ -211,7 +260,8 @@ export class AdminGroupTourRequestsController {
       },
     ]
     const createdIds: string[] = []
-    const sysActor = new Types.ObjectId(u._id as any)
+    const failed: string[] = []
+    const sysActor = new Types.ObjectId(u.sub)
     for (const r of samples) {
       try {
         const created = await this.svc.createPublic({
@@ -241,13 +291,13 @@ export class AdminGroupTourRequestsController {
         }
         if (r.status === 'quoting' || r.status === 'negotiating' || r.status === 'won') patch.lastContactedAt = mkDate(-1)
         if (r.status === 'contacted' || r.status === 'new') patch.followUpAt = mkDate(1)
-        await this.svc.patch((created._id as any).toString(), patch, sysActor, 'admin')
+        await this.svc.patch((created._id as any).toString(), patch as any, sysActor, 'admin')
         createdIds.push((created._id as any).toString())
-      } catch {
-        // skip duplicate etc.
+      } catch (e: any) {
+        failed.push(`${r.companyOrGroupName}: ${String(e?.message || e || 'unknown')}`)
       }
     }
     const after = await this.svc.list({ page: 1, pageSize: 1 }, sysActor)
-    return { ok: true, created: createdIds.length, total: after.total, staffCount: staffList.length }
+    return { ok: true, created: createdIds.length, failed: failed.length, failedReasons: failed, total: after.total, staffCount: staffList.length }
   }
 }

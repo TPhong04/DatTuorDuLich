@@ -9,9 +9,11 @@ import { BannersModule } from './banners/banners.module'
 import { BookingsModule } from './bookings/bookings.module'
 import { DashboardsModule } from './dashboards/dashboards.module'
 import { GroupTourRequestsModule } from './group-tour-requests/group-tour-requests.module'
+import { NotificationsModule } from './notifications/notifications.module'
 import { PostsModule } from './posts/posts.module'
 import { ReportsModule } from './reports/reports.module'
 import { ReviewsModule } from './reviews/reviews.module'
+import { ScheduleModule } from '@nestjs/schedule'
 import { StaffModule } from './staff/staff.module'
 import { ToursModule } from './tours/tours.module'
 import { UsersModule } from './users/users.module'
@@ -37,6 +39,7 @@ const envSchema = z.object({
         uri: config.getOrThrow<string>('MONGODB_URI'),
       }),
     }),
+    ScheduleModule.forRoot(),
     UsersModule,
     AuthModule,
     ToursModule,
@@ -48,6 +51,7 @@ const envSchema = z.object({
     BannersModule,
     PostsModule,
     ReviewsModule,
+    NotificationsModule,
     GroupTourRequestsModule,
   ],
 })

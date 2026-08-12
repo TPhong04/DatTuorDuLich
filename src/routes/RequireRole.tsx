@@ -11,12 +11,18 @@ export default function RequireRole({ role }: { role: 'staff' | 'admin' }) {
     return <Navigate replace to={`/auth/login?redirect=${redirect}`} />
   }
 
-  if (role === 'admin' && user.role !== 'admin') {
-    return <Navigate replace to="/" />
+  if (role === 'admin') {
+    if (user.role !== 'admin') {
+      if (user.role === 'staff') return <Navigate replace to="/staff" />
+      return <Navigate replace to="/" />
+    }
   }
 
-  if (role === 'staff' && user.role !== 'staff' && user.role !== 'admin') {
-    return <Navigate replace to="/" />
+  if (role === 'staff') {
+    if (user.role !== 'staff') {
+      if (user.role === 'admin') return <Navigate replace to="/admin" />
+      return <Navigate replace to="/" />
+    }
   }
 
   return <Outlet />

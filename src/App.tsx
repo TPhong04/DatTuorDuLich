@@ -10,6 +10,7 @@ import { BookingPageShell } from '@/pages/BookingPage'
 
 import AccountBookingsPage from '@/pages/AccountBookingsPage'
 import AccountEditPage from '@/pages/AccountEditPage'
+import AccountNotificationsPage from '@/pages/AccountNotificationsPage'
 import AccountPage from '@/pages/AccountPage'
 import AdminDashboardPage from '@/pages/AdminDashboardPage'
 import BookingPage from '@/pages/BookingPage'
@@ -38,6 +39,7 @@ import AdminContentPostsPage from '@/pages/admin/AdminContentPostsPage'
 import AdminContentReviewsPage from '@/pages/admin/AdminContentReviewsPage'
 import AdminDeparturesPage from '@/pages/admin/AdminDeparturesPage'
 import AdminGroupTourRequestsPage from '@/pages/admin/AdminGroupTourRequestsPage'
+import AdminNotificationsPage from '@/pages/admin/AdminNotificationsPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
 import AdminTourEditorPage from '@/pages/admin/AdminTourEditorPage'
 import AdminToursPage from '@/pages/admin/AdminToursPage'
@@ -57,6 +59,7 @@ import StaffBookingsPage from '@/pages/staff/StaffBookingsPage'
 import StaffContentReviewsPage from '@/pages/staff/StaffContentReviewsPage'
 import StaffDeparturesPage from '@/pages/staff/StaffDeparturesPage'
 import StaffGroupTourRequestsPage from '@/pages/staff/StaffGroupTourRequestsPage'
+import StaffNotificationsPage from '@/pages/staff/StaffNotificationsPage'
 import StaffToursPage from '@/pages/staff/StaffToursPage'
 
 function BookingPublicRoute() {
@@ -102,6 +105,7 @@ export default function App() {
               <Route path="/account" element={<AccountPage />} />
               <Route path="/account/edit" element={<AccountEditPage />} />
               <Route path="/account/bookings" element={<AccountBookingsPage />} />
+              <Route path="/account/notifications" element={<AccountNotificationsPage />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />
@@ -110,6 +114,7 @@ export default function App() {
           <Route element={<RequireRole role="staff" />}>
             <Route element={<StaffShell />} path="/staff">
               <Route index element={<StaffDashboardPage />} />
+              <Route path="notifications" element={<StaffNotificationsPage />} />
               <Route path="bookings" element={<StaffBookingsPage />} />
               <Route path="tours" element={<StaffToursPage />} />
               <Route path="departures" element={<StaffDeparturesPage />} />
@@ -122,6 +127,7 @@ export default function App() {
           <Route element={<RequireRole role="admin" />}>
             <Route element={<AdminShell />} path="/admin">
               <Route index element={<AdminDashboardPage />} />
+              <Route path="notifications" element={<AdminNotificationsPage />} />
               <Route path="tours" element={<AdminToursPage />} />
               <Route path="tours/new" element={<AdminTourEditorPage />} />
               <Route path="tours/:id/edit" element={<AdminTourEditorPage />} />

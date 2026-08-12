@@ -224,7 +224,7 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
             if (selectedDep.seatsAvailable < total) return toast.error(`Chỉ còn ${selectedDep.seatsAvailable} chỗ, vui lòng giảm số lượng hành khách.`)
             onNext()
           }}
-          className="inline-flex h-12 items-center justify-center rounded-2xl bg-orange-500 px-8 text-sm font-extrabold uppercase text-white shadow-sm shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
+          className="inline-flex h-12 items-center justify-center rounded-2xl bg-orange-500 px-8 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
         >
           Tiếp tục →
         </button>
@@ -496,7 +496,7 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
       </SectionCard>
 
       <div className="flex items-center justify-between">
-        <button type="button" onClick={onPrev} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 text-sm font-extrabold uppercase text-slate-700 hover:bg-slate-50">← Quay lại</button>
+        <button type="button" onClick={onPrev} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">← Quay lại</button>
         <button
           type="button"
           onClick={() => {
@@ -697,14 +697,14 @@ function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; on
         </label>
       </SectionCard>
       <div className="flex items-center justify-between">
-        <button type="button" onClick={onPrev} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 text-sm font-extrabold uppercase text-slate-700 hover:bg-slate-50">← Quay lại</button>
+        <button type="button" onClick={onPrev} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">← Quay lại</button>
         <button
           type="button"
           onClick={() => {
             if (!agree) return toast.error('Vui lòng đồng ý điều khoản & chính sách hủy trước khi đặt.')
             onConfirm({ method, surcharges, agree })
           }}
-          className="inline-flex h-13 items-center justify-center rounded-2xl bg-emerald-700 px-8 py-3 text-sm font-extrabold uppercase text-white shadow-md shadow-emerald-800/30 hover:bg-emerald-800 disabled:opacity-60"
+          className="inline-flex h-13 items-center justify-center rounded-2xl bg-emerald-700 px-8 py-3 text-xs font-extrabold uppercase text-white shadow-md shadow-emerald-800/30 hover:bg-emerald-800 disabled:opacity-60"
         >
           ✅ Xác nhận đặt tour
         </button>
@@ -778,7 +778,7 @@ export default function BookingPage() {
     <div className="mx-auto w-full max-w-3xl px-4 py-16 text-center">
       <h1 className="text-2xl font-extrabold text-slate-900">Không tìm thấy tour</h1>
       <p className="mt-2 text-sm text-slate-500">{errTour || 'Vui lòng quay lại trang danh sách tour và chọn lại.'}</p>
-      <Link to="/tours" className="mt-6 inline-flex h-11 items-center justify-center rounded-2xl bg-orange-500 px-6 text-sm font-extrabold uppercase text-white hover:bg-orange-600">← Quay lại danh sách tour</Link>
+      <Link to="/tours" className="mt-6 inline-flex h-11 items-center justify-center rounded-2xl bg-orange-500 px-6 text-xs font-extrabold uppercase text-white hover:bg-orange-600">← Quay lại danh sách tour</Link>
     </div>
   )
 

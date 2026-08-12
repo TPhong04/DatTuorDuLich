@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import PageHeader from '@/components/ui/PageHeader'
 import { useToast } from '@/components/notifications/ToastProvider'
@@ -59,6 +59,8 @@ function payStatusLabel(s: string) {
 
 export default function AccountBookingsPage() {
   const toast = useToast()
+  const [searchParams] = useSearchParams()
+  const highlightId = searchParams.get('id')
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<BookingSummary[]>([])
   const [total, setTotal] = useState(0)
@@ -137,7 +139,7 @@ export default function AccountBookingsPage() {
               </div>
             </div>
             {pendingRows[0]?.tourSlug ? (
-              <Link to={`/tours/${encodeURIComponent(pendingRows[0].tourSlug)}#tour-reviews`} className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm hover:brightness-110">
+              <Link to={`/tours/${encodeURIComponent(pendingRows[0].tourSlug)}#tour-reviews`} className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-[10px] font-extrabold uppercase text-white shadow-sm hover:brightness-110">
                 ⭐ Đánh giá ngay
               </Link>
             ) : null}
@@ -178,8 +180,8 @@ export default function AccountBookingsPage() {
               <input value={fQ} onChange={(e) => setFQ(e.target.value)} placeholder="Mã đặt chỗ / Tên tour / SĐT" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={refresh} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-orange-500 px-5 text-sm font-extrabold uppercase text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600">Tìm</button>
-              <button type="button" onClick={() => { setFStatus(''); setFFrom(''); setFTo(''); setFQ(''); setPage(1) }} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-5 text-sm font-extrabold uppercase text-slate-700 hover:bg-slate-50">Reset</button>
+              <button type="button" onClick={refresh} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600">Tìm</button>
+              <button type="button" onClick={() => { setFStatus(''); setFFrom(''); setFTo(''); setFQ(''); setPage(1) }} className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-5 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">Reset</button>
             </div>
           </div>
         </div>
@@ -196,7 +198,7 @@ export default function AccountBookingsPage() {
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
             <div className="text-sm font-bold text-slate-700">Bạn chưa có đơn đặt nào.</div>
             <p className="mt-1 text-xs text-slate-500">Khám phá các tour hot và đặt tour ngay để nhận ưu đãi sớm.</p>
-            <Link to="/tours" className="mt-4 inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-orange-500 px-6 text-sm font-extrabold uppercase text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600">Khám phá tour</Link>
+            <Link to="/tours" className="mt-4 inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-orange-500 px-6 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600">Khám phá tour</Link>
           </div>
         ) : (
           items.map((b) => {
@@ -204,8 +206,17 @@ export default function AccountBookingsPage() {
             const ps = payStatusLabel(b.paymentStatus)
             const rState = stateByBookingId.get(b.id)
             const rMeta = rState ? REVIEW_STATE_META[rState.reviewState] : null
+            const isHighlight = highlightId && (highlightId === b.id || highlightId === b.code)
             return (
-              <div key={b.id} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+              <div
+                id={isHighlight ? `booking-${b.id}` : undefined}
+                ref={(el) => { if (isHighlight && el) { setTimeout(() => { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 250) } }}
+                key={b.id}
+                className={cn(
+                  'group overflow-hidden rounded-3xl border bg-white shadow-sm transition hover:shadow-md',
+                  isHighlight ? 'border-orange-400 ring-4 ring-orange-200/60 shadow-lg shadow-orange-100' : 'border-slate-200',
+                )}
+              >
                 <div className="grid gap-0 md:grid-cols-[180px_minmax(0,1fr)]">
                   <Link to={b.tour.slug ? `/tours/${b.tour.slug}` : '/tours'} className="relative block aspect-[4/3] w-full bg-slate-100 md:aspect-auto">
                     {b.tour.coverImageUrl ? <img alt={b.tour.title} src={b.tour.coverImageUrl} className="h-full w-full object-cover transition group-hover:scale-[1.02]" /> : null}
@@ -274,14 +285,14 @@ export default function AccountBookingsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {rState?.canReview === true && b.tour.slug ? (
-                          <Link to={`/tours/${b.tour.slug}#tour-reviews`} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-4 text-xs font-extrabold uppercase text-white shadow-sm hover:brightness-110">
+                          <Link to={`/tours/${b.tour.slug}#tour-reviews`} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-4 text-[10px] font-extrabold uppercase text-white shadow-sm hover:brightness-110">
                             ⭐ Đánh giá
                           </Link>
                         ) : null}
                         {b.tour.slug ? (
-                          <Link to={`/tours/${b.tour.slug}`} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">Xem tour</Link>
+                          <><Link to={`/tours/${b.tour.slug}`} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-extrabold uppercase text-slate-700 hover:bg-slate-50">Xem tour</Link>
+                        <button type="button" className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-slate-900 px-4 text-[10px] font-extrabold uppercase text-white shadow-sm hover:bg-slate-800">Chi tiết đơn</button></>
                         ) : null}
-                        <button type="button" className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-slate-900 px-4 text-xs font-extrabold uppercase text-white shadow-sm hover:bg-slate-800">Chi tiết đơn</button>
                       </div>
                     </div>
                   </div>

@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model, Types } from 'mongoose'
+import { NotificationsService, CreateNotificationInput } from '../notifications/notifications.service'
+import { NotificationType } from '../notifications/notification.schema'
 import { Booking, BookingDocument, BookingStatus, BookingTourSnapshot, BookingPassenger, BookingSurchargeLine } from './booking.schema'
 import { CreateBookingPayload, ListBookingsQuery, UpdateBookingStatusPayload } from './dto'
 import { Tour, TourDocument, TourDeparture } from '../tours/tour.schema'
@@ -36,6 +38,7 @@ export class BookingsService {
   constructor(
     @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
     @InjectModel(Tour.name) private readonly tourModel: Model<TourDocument>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async generateBookingCode(attempt = 0): Promise<string> {
@@ -233,6 +236,7 @@ export class BookingsService {
     } as any
     tour.totalBookings = Number(tour.totalBookings || 0) + 1
     await tour.save()
+    try { await this.emitBookingCreatedNotifications(doc) } catch {}
     return doc
   }
 
@@ -247,21 +251,49 @@ export class BookingsService {
   }
 
   async listMyBookings(userId: Types.ObjectId, query: ListBookingsQuery) {
-    const filter: any = { createdBy: userId }
-    if (query.status) filter.status = query.status
-    if (query.from) { filter.createdAt = filter.createdAt || {}; filter.createdAt.$gte = new Date(query.from as string) }
-    if (query.to) { filter.createdAt = filter.createdAt || {}; filter.createdAt.$lte = new Date(new Date(query.to as string).getTime() + 23 * 3600 * 1000 + 59 * 60 * 1000 + 999) }
+    const userOid = userId instanceof Types.ObjectId ? userId : new Types.ObjectId(String(userId))
+    const resolvedUser = (async () => { try { return await this.bookingModel.db.collection('users').findOne({ _id: userOid }, { projection: { email: 1, phone: 1 } }) as any } catch { return null } })()
+    const emails = new Set<string>()
+    const phones = new Set<string>()
+    try {
+      const u = await resolvedUser
+      if (u?.email && typeof u.email === 'string') emails.add(u.email.trim().toLowerCase())
+      if (u?.phone && typeof u.phone === 'string') phones.add(u.phone.replace(/\D+/g, ''))
+    } catch {}
+    const orRoot: any[] = [{ createdBy: userOid }]
+    if (emails.size) orRoot.push({ 'contact.email': { $in: Array.from(emails).map((e) => new RegExp('^' + e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i')) } })
+    if (phones.size) {
+      orRoot.push({
+        $or: Array.from(phones).map((p) => ({
+          $expr: {
+            $eq: [
+              { $replaceAll: { input: { $replaceAll: { input: { $ifNull: ['$contact.phone', ''] }, find: ' ', replacement: '' } }, find: '-', replacement: '' } },
+              p,
+            ],
+          },
+        })),
+      })
+    }
+    const filter: any = { $or: orRoot }
+    const baseFilter: any = {}
+    if (query.status) baseFilter.status = query.status
+    if (query.from) { baseFilter.createdAt = baseFilter.createdAt || {}; baseFilter.createdAt.$gte = new Date(query.from as string) }
+    if (query.to) { baseFilter.createdAt = baseFilter.createdAt || {}; baseFilter.createdAt.$lte = new Date(new Date(query.to as string).getTime() + 23 * 3600 * 1000 + 59 * 60 * 1000 + 999) }
     if (query.q) {
       const qr = new RegExp(String(query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
-      filter.$or = [{ code: qr }, { 'tourSnapshot.title': qr }, { 'contact.name': qr }, { 'contact.phone': qr }]
+      baseFilter.$or = [{ code: qr }, { 'tourSnapshot.title': qr }, { 'contact.name': qr }, { 'contact.phone': qr }]
     }
+    const finalFilter = Object.keys(baseFilter).length ? { $and: [filter, baseFilter] } : filter
     const page = Math.max(1, Number(query.page) || 1)
     const limit = Math.min(100, Math.max(5, Number(query.limit) || 20))
     const skip = (page - 1) * limit
     const [items, total] = await Promise.all([
-      this.bookingModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
-      this.bookingModel.countDocuments(filter),
+      this.bookingModel.find(finalFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
+      this.bookingModel.countDocuments(finalFilter),
     ])
+    // #region debug-point listMyBookings-resolve
+    ;(() => { let u = 'http://127.0.0.1:7788/event', s = 'notifications-push-slow-missing'; try { const e = require('fs').readFileSync('.dbg/notifications-push-slow-missing.env', 'utf8'); u = e.match(/DEBUG_SERVER_URL=(.+)/)?.[1] || u; s = e.match(/DEBUG_SESSION_ID=(.+)/)?.[1] || s } catch {} fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: s, runId: 'post-fix-h6', hypothesisId: 'A3', location: 'bookings.service.ts:253', msg: '[DEBUG] listMyBookings result for user', data: { userId: String(userOid), resolvedEmails: Array.from(emails), resolvedPhones: Array.from(phones), total, page, limit, firstId: items[0]?._id ? String(items[0]._id) : null, filter: JSON.stringify(finalFilter) }, ts: Date.now() }) }).catch(() => { }) })();
+    // #endregion
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 
@@ -325,6 +357,240 @@ export class BookingsService {
     }
     booking.status = nextStatus
     if (typeof payload.adminNote === 'string' && payload.adminNote) booking.adminNote = payload.adminNote
-    return booking.save()
+    const saved = await booking.save()
+    try { await this.emitBookingStatusChanged(prevStatus, saved) } catch {}
+    return saved
+  }
+
+  private async emitBookingCreatedNotifications(doc: BookingDocument) {
+    const list: CreateNotificationInput[] = []
+    const title = `Đặt chỗ thành công - ${doc.code}`
+    const dateStr = doc.departureDate ? new Date(doc.departureDate as any).toLocaleDateString('vi-VN') : '—'
+    const totalStr = Number(doc.totalAmount || 0).toLocaleString('vi-VN') + 'đ'
+    if (doc.createdBy) {
+      list.push({
+        recipientId: new Types.ObjectId(String(doc.createdBy)),
+        recipientRole: 'customer',
+        type: 'gtr_booking_created' as NotificationType,
+        title,
+        body: `Chúc mừng! ${doc.tourSnapshot?.title || 'Tour'} ngày ${dateStr} - Tổng ${totalStr}. Vui lòng thanh toán cọc ${doc.holdsUntil ? ('trước ' + new Date(doc.holdsUntil as any).toLocaleString('vi-VN')) : ''} để giữ chỗ.`,
+        entityType: 'booking',
+        entityId: doc._id as any,
+        actionUrl: `/account/bookings?id=${doc._id}`,
+        priority: 'high',
+        channels: ['in_app', 'email'],
+      })
+    }
+    const admins = await this.bookingModel.db.collection('users').find({ role: 'admin', isActive: { $ne: false } }).project({ _id: 1 }).toArray()
+    const notifyPriority: CreateNotificationInput['priority'] = Number(doc.totalAmount || 0) > 50_000_000 ? 'high' : 'medium'
+    for (const a of admins) {
+      list.push({
+        recipientId: new Types.ObjectId(String(a._id)),
+        recipientRole: 'admin',
+        type: 'admin_new_booking' as NotificationType,
+        title: `🚨 CẦN XỬ LÝ NGAY - Đơn đặt mới: ${doc.code} - ${doc.tourSnapshot?.title || 'Tour'}`,
+        body: `${dateStr} - ${(doc.adultCount || 0) + (doc.childCount || 0) + (doc.infantCount || 0)} khách - ${totalStr}. Khách: ${doc.contact?.name || ''} ${doc.contact?.phone || ''}${doc.notes ? (' · Ghi chú: ' + doc.notes.slice(0, 80)) : ''}`,
+        entityType: 'booking',
+        entityId: doc._id as any,
+        actionUrl: `/admin/bookings?id=${doc._id}`,
+        priority: notifyPriority,
+      })
+    }
+    try {
+      const staffIds = new Set<string>()
+      if ((doc as any).updatedByStaffId) staffIds.add(String((doc as any).updatedByStaffId))
+      if (Array.isArray((doc as any).assignedStaffIds)) for (const s of (doc as any).assignedStaffIds) staffIds.add(String(s))
+      const idsArr = Array.from(staffIds).map((x) => new Types.ObjectId(x)).filter((x) => Types.ObjectId.isValid(x))
+      if (!idsArr.length) {
+        try {
+          const allStaff = await this.bookingModel.db.collection('users').find({ role: 'staff', isActive: { $ne: false } }, { projection: { _id: 1, limit: 30 } }).toArray() as any[]
+          for (const s of allStaff.slice(0, 20)) idsArr.push(new Types.ObjectId(String(s._id)))
+        } catch {}
+      }
+      const staffList = idsArr.length ? await this.bookingModel.db.collection('users').find({ _id: { $in: idsArr }, role: 'staff', isActive: { $ne: false } }, { projection: { _id: 1 } }).toArray() as any[] : []
+      for (const s of staffList) {
+        list.push({
+          recipientId: new Types.ObjectId(String(s._id)),
+          recipientRole: 'staff',
+          type: 'staff_new_booking' as NotificationType,
+          title: `📥 CÓ ĐƠN MỚI CẦN XỬ LÝ - ${doc.code}`,
+          body: `${doc.tourSnapshot?.title || 'Tour'} - ${dateStr} - ${totalStr}. Admin click để giao việc hoặc bạn nhấn nút TIẾP NHẬN để xử lý!`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/staff/bookings?id=${doc._id}`,
+          priority: notifyPriority,
+        })
+      }
+    } catch {}
+    if (list.length) await this.notifications.bulk(list)
+  }
+
+  private async resolveCustomerRecipient(doc: BookingDocument): Promise<{ id: Types.ObjectId | null; note: string }> {
+    if (!doc) return { id: null, note: 'no-doc' }
+    try {
+      if (doc.createdBy) {
+        const db = this.bookingModel.db.collection('users')
+        const creator = await db.findOne({ _id: new Types.ObjectId(String(doc.createdBy)) }, { projection: { _id: 1, role: 1, email: 1 } }).catch(() => null) as any
+        if (creator && String(creator.role || '').toLowerCase() === 'customer') {
+          return { id: new Types.ObjectId(String(creator._id)), note: 'createdBy-is-customer' }
+        }
+      }
+      const email = typeof doc.contact?.email ? String(doc.contact.email).trim().toLowerCase() : null
+      if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        const db = this.bookingModel.db.collection('users')
+        const found = await db.findOne({ email, isActive: { $ne: false } }, { projection: { _id: 1, role: 1 } }).catch(() => null) as any
+        if (found) return { id: new Types.ObjectId(String(found._id)), note: 'matched-contact-email' }
+      }
+      return { id: null, note: 'no-customer-user-found' }
+    } catch (err: any) {
+      return { id: null, note: `error:${String(err?.message || err)}` }
+    }
+  }
+
+  private async emitBookingStatusChanged(prevStatus: string, doc: BookingDocument) {
+    // #region debug-point H4:booking-emit-status-guard-entry
+    ;(() => { let u = 'http://127.0.0.1:7788/event', s = 'notifications-push-slow-missing'; try { const e = require('fs').readFileSync('.dbg/notifications-push-slow-missing.env', 'utf8'); u = e.match(/DEBUG_SERVER_URL=(.+)/)?.[1] || u; s = e.match(/DEBUG_SESSION_ID=(.+)/)?.[1] || s } catch {} fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: s, runId: 'post-fix-h6', hypothesisId: 'H6', location: 'bookings.service.ts:373', msg: '[DEBUG] POST-FIX-H6 emitBookingStatusChanged entry guard + recipient resolver', data: { code: String(doc.code || doc._id), prevStatus, nextStatus: doc.status, paymentStatus: doc.paymentStatus, hasCreatedBy: Boolean(doc.createdBy), createdById: doc.createdBy ? String(doc.createdBy) : null, contactEmail: doc.contact?.email || null, guardCondNotCreatedByAndSameStatus: !doc.createdBy && prevStatus === doc.status, changedPaymentExprNow: prevStatus !== doc.status || (doc.paymentStatus as any) !== (doc as any).prevPaymentStatus }, ts: Date.now() }) }).catch(() => { }) })();
+    // #endregion
+    if (!doc.createdBy && prevStatus === doc.status) return
+    const customer = await this.resolveCustomerRecipient(doc)
+    const customerRecipientId = customer.id
+    // #region debug-point H6:customer-resolve
+    ;(() => { let u = 'http://127.0.0.1:7788/event', s = 'notifications-push-slow-missing'; try { const e = require('fs').readFileSync('.dbg/notifications-push-slow-missing.env', 'utf8'); u = e.match(/DEBUG_SERVER_URL=(.+)/)?.[1] || u; s = e.match(/DEBUG_SESSION_ID=(.+)/)?.[1] || s } catch {} fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: s, runId: 'post-fix-h6', hypothesisId: 'H6', location: 'bookings.service.ts:376', msg: '[DEBUG] POST-FIX-H6 customer recipient resolve result', data: { code: String(doc.code || doc._id), resolveNote: customer.note, resolvedId: customerRecipientId ? String(customerRecipientId) : null, recipientMissing: !customerRecipientId }, ts: Date.now() }) }).catch(() => { }) })();
+    // #endregion
+
+    const code = String(doc.code || doc._id)
+    const tourName = doc.tourSnapshot?.title || 'Tour'
+    const nextStatus = doc.status
+    const changedPayment = prevStatus !== nextStatus || (doc.paymentStatus as any) !== (doc as any).prevPaymentStatus
+
+    const pushStaffList = async (list: CreateNotificationInput[], title: string, body: string) => {
+      const uniq = new Map<string, Types.ObjectId>()
+      const addId = (rawId: any) => {
+        if (!rawId) return
+        try {
+          const id = new Types.ObjectId(String(rawId))
+          uniq.set(String(id), id)
+        } catch {}
+      }
+      addId((doc as any).updatedByStaffId)
+      if (Array.isArray((doc as any).assignedStaffIds)) for (const raw of (doc as any).assignedStaffIds) addId(raw)
+      if (!uniq.size) return
+      const ids = Array.from(uniq.values())
+      try {
+        const db = this.bookingModel.db.collection('users')
+        const staffs = await db.find({ _id: { $in: ids }, role: 'staff', isActive: { $ne: false } }, { projection: { _id: 1, role: 1 } }).toArray() as any[]
+        for (const stf of staffs) {
+          list.push({
+            recipientId: new Types.ObjectId(String(stf._id)),
+            recipientRole: 'staff',
+            type: 'staff_booking_updated' as NotificationType,
+            title,
+            body,
+            entityType: 'booking',
+            entityId: doc._id as any,
+            actionUrl: `/staff/bookings?id=${doc._id}`,
+            priority: 'medium',
+          })
+        }
+      } catch {}
+    }
+
+    const list: CreateNotificationInput[] = []
+    const admins = await this.bookingModel.db.collection('users').find({ role: 'admin', isActive: { $ne: false } }).project({ _id: 1 }).toArray()
+
+    if ((doc.paymentStatus === 'partial' || doc.paymentStatus === 'paid') && prevStatus !== nextStatus) {
+      if (customerRecipientId) {
+        list.push({
+          recipientId: customerRecipientId,
+          recipientRole: 'customer',
+          type: 'booking_deposit_paid' as NotificationType,
+          title: `Đã nhận đặt cọc - ${code}`,
+          body: `Đơn ${tourName} - Cảm ơn bạn đã thanh toán cọc. Biên lai sẽ được gửi email trong vài phút.`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/account/bookings?id=${doc._id}`,
+          priority: 'high',
+          channels: ['in_app', 'email'],
+        })
+      }
+      for (const a of admins) {
+        list.push({
+          recipientId: new Types.ObjectId(String(a._id)),
+          recipientRole: 'admin',
+          type: 'admin_booking_updated' as NotificationType,
+          title: `Nhận cọc: ${code} - ${tourName}`,
+          body: `${Number(doc.totalAmount || 0).toLocaleString('vi-VN')}đ - Thanh toán ${doc.paymentStatus}. Khách: ${doc.contact?.name || ''} ${doc.contact?.phone || ''}`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/admin/bookings?id=${doc._id}`,
+          priority: 'medium',
+        })
+      }
+      await pushStaffList(list, `Nhận cọc booking ${code}`, `${tourName} - ${Number(doc.totalAmount || 0).toLocaleString('vi-VN')}đ. Khách ${doc.contact?.name || ''}`)
+    }
+
+    if (nextStatus === 'confirmed' && prevStatus !== nextStatus) {
+      if (customerRecipientId) {
+        list.push({
+          recipientId: customerRecipientId,
+          recipientRole: 'customer',
+          type: 'booking_confirmed' as NotificationType,
+          title: `Booking đã xác nhận - ${code}`,
+          body: `${tourName} đã xác nhận tất cả dịch vụ (vé máy bay, khách sạn, xe, bảo hiểm). ${doc.departureStandardText ? ('Thông tin gặp mặt: ' + doc.departureStandardText) : ''}`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/account/bookings?id=${doc._id}`,
+          priority: 'high',
+          channels: ['in_app', 'email'],
+        })
+      }
+      for (const a of admins) {
+        list.push({
+          recipientId: new Types.ObjectId(String(a._id)),
+          recipientRole: 'admin',
+          type: 'admin_booking_updated' as NotificationType,
+          title: `Đã xác nhận booking: ${code} - ${tourName}`,
+          body: `Ngày đi ${doc.departureDate ? new Date(doc.departureDate as any).toLocaleDateString('vi-VN') : ''}. ${(doc.adultCount || 0) + (doc.childCount || 0) + (doc.infantCount || 0)} khách - ${Number(doc.totalAmount || 0).toLocaleString('vi-VN')}đ`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/admin/bookings?id=${doc._id}`,
+          priority: 'medium',
+        })
+      }
+      await pushStaffList(list, `Xác nhận booking ${code}`, `${tourName} - ${Number(doc.totalAmount || 0).toLocaleString('vi-VN')}đ. Vui lòng liên hệ xác nhận khách.`)
+    }
+
+    if (nextStatus === 'cancelled' && prevStatus !== nextStatus) {
+      if (customerRecipientId) {
+        list.push({
+          recipientId: customerRecipientId,
+          recipientRole: 'customer',
+          type: 'booking_cancelled' as NotificationType,
+          title: `Booking đã hủy - ${code}`,
+          body: `${tourName} mã ${code} đã hủy. ${doc.cancelledAt ? ('Thời gian: ' + new Date(doc.cancelledAt as any).toLocaleString('vi-VN')) : ''}. Hoàn tiền sẽ về tài khoản trong 3-5 ngày làm việc.`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/account/bookings?id=${doc._id}`,
+          priority: 'medium',
+          channels: ['in_app', 'email'],
+        })
+      }
+      for (const a of admins) {
+        list.push({
+          recipientId: new Types.ObjectId(String(a._id)),
+          recipientRole: 'admin',
+          type: 'admin_booking_updated' as NotificationType,
+          title: `Hủy booking: ${code} - ${tourName}`,
+          body: `Lý do: ${(doc as any).cancelReason || 'Không ghi rõ'}. Số tiền hoàn: ${Number(doc.totalAmount || 0).toLocaleString('vi-VN')}đ`,
+          entityType: 'booking',
+          entityId: doc._id as any,
+          actionUrl: `/admin/bookings?id=${doc._id}`,
+          priority: 'medium',
+        })
+      }
+      await pushStaffList(list, `Khách hủy booking ${code}`, `${tourName} - Vui lòng kiểm tra và xác nhận hoàn tiền cho khách.`)
+    }
+
+    if (list.length) await this.notifications.bulk(list)
   }
 }

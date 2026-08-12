@@ -52,11 +52,13 @@ export type GroupTourRequest = {
   followUpAt: string | null
   lastContactedAt: string | null
   wonAt: string | null
+  lostAt: string | null
   assignedStaffId: string | null
   convertedBookingId: string | null
   lostReason: string | null
   internalStaffNote: string | null
   createdByUserId: string | null
+  updatedByStaffId: string | null
   sourceChannel: string | null
   ipAddress: string | null
   createdAt: string
@@ -205,6 +207,46 @@ export async function patchStaffGroupTourRequest(id: string, payload: AdminPatch
 export async function markStaffGroupTourRequestContacted(id: string) {
   const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/staff/group-tour-requests/${encodeURIComponent(id)}/mark-contacted`, { method: 'PATCH' })
   return res.row as GroupTourRequest
+}
+
+export async function markStaffGroupTourRequestQuoting(id: string, payload?: { summary?: string; followUpDays?: number }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/staff/group-tour-requests/${encodeURIComponent(id)}/mark-quoting`, { method: 'PATCH', body: JSON.stringify(payload || {}) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markStaffGroupTourRequestNegotiating(id: string, payload?: { note?: string; followUpDays?: number }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/staff/group-tour-requests/${encodeURIComponent(id)}/mark-negotiating`, { method: 'PATCH', body: JSON.stringify(payload || {}) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markStaffGroupTourRequestWon(id: string, payload?: { note?: string }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/staff/group-tour-requests/${encodeURIComponent(id)}/mark-won`, { method: 'PATCH', body: JSON.stringify(payload || {}) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markStaffGroupTourRequestLost(id: string, payload: { reason: string }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/staff/group-tour-requests/${encodeURIComponent(id)}/mark-lost`, { method: 'PATCH', body: JSON.stringify(payload) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markAdminGroupTourRequestQuoting(id: string, payload?: { summary?: string; followUpDays?: number }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/admin/group-tour-requests/${encodeURIComponent(id)}/mark-quoting`, { method: 'PATCH', body: JSON.stringify(payload || {}) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markAdminGroupTourRequestNegotiating(id: string, payload?: { note?: string; followUpDays?: number }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/admin/group-tour-requests/${encodeURIComponent(id)}/mark-negotiating`, { method: 'PATCH', body: JSON.stringify(payload || {}) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markAdminGroupTourRequestWon(id: string, payload?: { note?: string }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/admin/group-tour-requests/${encodeURIComponent(id)}/mark-won`, { method: 'PATCH', body: JSON.stringify(payload || {}) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
+}
+
+export async function markAdminGroupTourRequestLost(id: string, payload: { reason: string }) {
+  const res = await apiFetch<BaseEnvelope<GroupTourRequest[]>>(`/admin/group-tour-requests/${encodeURIComponent(id)}/mark-lost`, { method: 'PATCH', body: JSON.stringify(payload) })
+  return { row: res.row as GroupTourRequest, message: res.message as string | undefined }
 }
 
 export function totalGroupTourGuests(r: Pick<GroupTourRequest, 'adultCount' | 'childCount' | 'infantCount'>) {
