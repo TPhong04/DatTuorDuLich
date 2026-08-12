@@ -7,6 +7,7 @@ import { AdminModule } from './admin/admin.module'
 import { AuthModule } from './auth/auth.module'
 import { BannersModule } from './banners/banners.module'
 import { BookingsModule } from './bookings/bookings.module'
+import { ChatModule } from './chat/chat.module'   // 👈 thêm import này
 import { DashboardsModule } from './dashboards/dashboards.module'
 import { GroupTourRequestsModule } from './group-tour-requests/group-tour-requests.module'
 import { PostsModule } from './posts/posts.module'
@@ -23,6 +24,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(1),
   JWT_ACCESS_EXPIRES_IN: z.string().min(1),
   JWT_REFRESH_EXPIRES_IN: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1),
 })
 
 @Module({
@@ -49,6 +51,7 @@ const envSchema = z.object({
     PostsModule,
     ReviewsModule,
     GroupTourRequestsModule,
+    ChatModule,   // 👈 thêm dòng này vào imports
   ],
 })
 export class AppModule {}
