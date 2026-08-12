@@ -1,0 +1,47 @@
+<div class="container mt-5">
+    <div class="card search-card">
+        <p class="subtitle">Tìm kiếm</p>
+        <h1>Tìm kiếm bài viết & tác giả</h1>
+        <p class="welcome-text">Nhập từ khóa để tìm bài viết hoặc thông tin thành viên trong nhóm.</p>
+
+        <form action="/search" method="GET" class="contact-form">
+            <div class="form-group mb-3">
+                <label>Từ khóa</label>
+                <input type="text" name="q" class="form-control" placeholder="Nhập từ khóa..." value="{{keyword}}">
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Loại tìm kiếm</label>
+                <select class="form-control" name="type">
+                    <option value="post" {{#unless typeIsAuthor}}selected{{/unless}}>Bài viết</option>
+                    <option value="author" {{#if typeIsAuthor}}selected{{/if}}>Tác giả</option>
+                </select>
+            </div>
+
+            <button class="btn-primary" type="submit">Tìm kiếm</button>
+        </form>
+    </div>
+
+    {{#if searched}}
+    <div class="card" style="margin-top: 24px;">
+        {{#if hasResults}}
+            <p class="subtitle">{{resultsCount}} kết quả</p>
+            <div class="members-grid">
+                {{#each results}}
+                <div class="member-card">
+                    <img src="{{this.image}}" alt="{{this.name}}" class="member-avatar">
+                    <div class="member-name">{{this.name}}</div>
+                    <ul class="member-info">
+                        <li><span class="label">MSSV:</span><span class="value">{{this.mssv}}</span></li>
+                        <li><span class="label">Lớp:</span><span class="value">{{this.lop}}</span></li>
+                        <li><span class="label">Địa chỉ:</span><span class="value">{{this.diaChi}}</span></li>
+                    </ul>
+                </div>
+                {{/each}}
+            </div>
+        {{else}}
+            <p class="welcome-text">Không tìm thấy kết quả nào cho "<strong>{{keyword}}</strong>".</p>
+        {{/if}}
+    </div>
+    {{/if}}
+</div>

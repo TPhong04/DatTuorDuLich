@@ -1,0 +1,104 @@
+<div class="auth-page" style="background-image: linear-gradient(180deg, rgba(14,51,63,0.22), rgba(14,51,63,0.32)), url('/picture/bia_dulich.png'); background-size: cover; background-position: center;">
+    <div class="auth-container">
+        <div class="auth-brand">
+            <img src="/picture/logo4.png" alt="Viet Travel Tour" class="auth-logo">
+            <span class="auth-brand-title">
+                <span class="auth-brand-dark">VietNam</span><span class="auth-brand-light">Explore</span>
+            </span>
+            <span class="auth-brand-slogan">
+                <i>Mỗi hành trình là một trải nghiệm</i>
+            </span>
+        </div>  
+
+        <div class="card auth-card" style="background: rgba(255, 255, 255, 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
+            <span class="subtitle">Thành viên mới</span>
+            <h1>Tạo tài khoản</h1>
+            <p class="welcome-text">
+                Đăng ký để nhận ưu đãi và theo dõi các chuyến đi sắp tới của bạn.
+            </p>
+
+            {{#if error}}
+            <div class="auth-alert auth-alert-error">{{error}}</div>
+            {{/if}}
+
+            <form class="auth-form auth-form-compact" action="/register" method="POST" autocomplete="off">
+                <div class="form-group mb-3">
+                    <label>Họ tên</label>
+                    <input type="text" name="fullname" class="form-control" placeholder="Nguyễn Văn A" autocomplete="off" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="ban@email.com" autocomplete="off" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>Số điện thoại</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="09xxxxxxxx" autocomplete="off" required>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group mb-3">
+                        <label>Mật khẩu</label>
+                        <div class="password-wrap">
+                            <input type="password" name="password" id="password" class="form-control" placeholder="Tối thiểu 6 ký tự" minlength="6" autocomplete="new-password" required>
+                            <button type="button" class="toggle-pw" data-target="password" aria-label="Hiện/ẩn mật khẩu">
+                                <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Xác nhận mật khẩu</label>
+                        <div class="password-wrap">
+                            <input type="password" name="confirmPassword" id="confirmPassword" class="form-control" placeholder="Nhập lại mật khẩu" minlength="6" autocomplete="new-password" required>
+                            <button type="button" class="toggle-pw" data-target="confirmPassword" aria-label="Hiện/ẩn mật khẩu">
+                                <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary btn-block">Đăng ký</button>
+            </form>
+
+            <p class="auth-switch">
+                Đã có tài khoản? <a href="/login">Đăng nhập ngay</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.toggle-pw').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var targetId = btn.getAttribute('data-target');
+            var input = document.getElementById(targetId);
+            var eyeIcon = btn.querySelector('.icon-eye');
+            var eyeOffIcon = btn.querySelector('.icon-eye-off');
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = '';
+            } else {
+                input.type = 'password';
+                eyeIcon.style.display = '';
+                eyeOffIcon.style.display = 'none';
+            }
+        });
+    });
+</script>

@@ -1,0 +1,51 @@
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-brand">
+            <img src="/picture/logo4.png" alt="Viet Travel Tour" class="auth-logo">
+            <span class="auth-brand-title">
+                <span class="auth-brand-dark">VietNam</span><span class="auth-brand-light">Explore</span>
+            </span>
+            <span class="auth-brand-slogan">
+                <i>Mỗi hành trình là một trải nghiệm</i>
+            </span>
+        </div>
+
+        <div class="card auth-card" style="background: rgba(255, 255, 255, 0.70); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
+            <span class="subtitle">Chào mừng bạn quay lại</span>
+            <h1>Đăng nhập</h1>
+            <p class="welcome-text">
+                Đăng nhập để tiếp tục đặt tour và khám phá những hành trình mới.
+            </p>
+
+            {{#if error}}
+            <div class="auth-alert auth-alert-error">{{error}}</div>
+            {{/if}}
+
+            <form class="auth-form" action="/login" method="POST">
+                <div class="form-group mb-3">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="ban@email.com" value="{{email}}" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>Mật khẩu</label>
+                    <input type="password" name="password" class="form-control" placeholder="Nhập mật khẩu" required>
+                </div>
+
+                <div class="auth-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="remember">
+                        Ghi nhớ đăng nhập
+                    </label>
+                    <a href="#" class="forgot-link">Quên mật khẩu?</a>
+                </div>
+
+                <button type="submit" class="btn-primary btn-block">Đăng nhập</button>
+            </form>
+
+            <p class="auth-switch">
+                Chưa có tài khoản? <a href="/register">Đăng ký ngay để nhận ưu đãi tour</a>
+            </p>
+        </div>
+    </div>
+</div>

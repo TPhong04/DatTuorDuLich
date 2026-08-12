@@ -1,0 +1,133 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" href="/home">
+        <img src="/picture/logo4.png" alt="Viet Travel Tour" class="logo-img">
+        <span class="brand-text-wrap">
+            <span class="brand-title">
+                <span class="brand-dark">VietNam</span><span class="brand-light">Explore</span>
+            </span>
+            <span class="brand-slogan">
+                <i>Mỗi hành trình là một trải nghiệm</i>
+            </span>
+        </span>
+    </a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarMenu">
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="/home">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9.5 12 3l9 6.5"></path>
+                        <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"></path>
+                    </svg>
+                    <span>Trang chủ</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/tours">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 11l19-9-9 19-2-8-8-2z"></path>
+                    </svg>
+                    <span>Tour</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/about">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="12" y1="16" x2="12" y2="11"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span>Giới thiệu</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/contact">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Liên hệ</span>
+                </a>
+            </li>
+
+            <!-- Ô TÌM KIẾM INLINE -->
+            <li class="nav-item nav-search-item">
+                <form class="nav-search-form" id="navSearchForm" onsubmit="return false;">
+                    <svg class="nav-icon nav-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input
+                        type="text"
+                        id="navSearchInput"
+                        class="nav-search-input"
+                        placeholder="Tìm tour, điểm đến..."
+                        autocomplete="off">
+                </form>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link btn-nav-login" href="/login">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Tài khoản</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<script>
+(function () {
+    var input = document.getElementById('navSearchInput');
+    if (!input) return;
+
+    function filterProducts(keyword) {
+        var kw = keyword.trim().toLowerCase();
+        var cards = document.querySelectorAll('.product-grid .product-card:not(.empty-card)');
+        var visibleCount = 0;
+
+        cards.forEach(function (card) {
+            var nameEl = card.querySelector('.product-name');
+            var name = nameEl ? nameEl.textContent.toLowerCase() : '';
+            var match = kw === '' || name.indexOf(kw) !== -1;
+            card.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        });
+
+        // Nếu đang không ở trang chủ (không có product-grid), chuyển hướng khi Enter
+        var grid = document.querySelector('.product-grid');
+        if (!grid) {
+            return false;
+        }
+
+        // Cuộn tới khu vực danh sách tour khi bắt đầu gõ
+        if (kw !== '') {
+            var menuSection = document.getElementById('menu');
+            if (menuSection) {
+                menuSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        return true;
+    }
+
+    input.addEventListener('input', function () {
+        filterProducts(input.value);
+    });
+
+    document.getElementById('navSearchForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var grid = document.querySelector('.product-grid');
+        if (!grid) {
+            // Không ở trang chủ -> điều hướng về trang chủ kèm từ khóa
+            window.location.href = '/home?search=' + encodeURIComponent(input.value.trim());
+        } else {
+            filterProducts(input.value);
+        }
+    });
+})();
+</script>

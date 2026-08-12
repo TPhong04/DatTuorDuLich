@@ -1,0 +1,54 @@
+<div class="section-head">
+    <span class="subtitle">Quản lý</span>
+    <h2 class="section-title">DANH MỤC TOUR (CATEGORY)</h2>
+    <div class="divider"></div>
+</div>
+
+<div class="card" style="max-width: 700px; text-align: left;">
+    <span class="subtitle">Thêm mới</span>
+    <h1 style="text-align:center;">Thêm vùng / khu vực cho tour</h1>
+
+    {{#if error}}
+    <div class="auth-alert auth-alert-error">{{error}}</div>
+    {{/if}}
+
+    <form class="auth-form" action="/categories" method="POST">
+        <div class="form-group mb-3">
+            <label>Loại</label>
+            <select name="parent" class="form-control" required>
+                <option value="">-- Chọn Trong nước / Nước ngoài --</option>
+                {{#each mainCategories}}
+                <option value="{{this._id}}">{{this.name}}</option>
+                {{/each}}
+            </select>
+        </div>
+
+        <div class="form-group mb-3">
+            <label>Tên vùng</label>
+            <input type="text" name="name" class="form-control" placeholder="Ví dụ: TP.HCM, Miền Bắc, Châu Âu..." required>
+        </div>
+
+        <button type="submit" class="btn-primary btn-block">Thêm</button>
+    </form>
+</div>
+
+<div class="card" style="max-width: 700px; text-align: left; margin-top: 24px;">
+    <h1 style="text-align:center;">Danh sách hiện có</h1>
+
+    <ul class="info-list">
+        {{#each categories}}
+        <li>
+            <div class="label">{{this.name}}</div>
+            <div class="value">
+                {{#if this.children.length}}
+                {{#each this.children}}{{this.name}}{{#unless @last}}, {{/unless}}{{/each}}
+                {{else}}
+                (chưa có vùng nào)
+                {{/if}}
+            </div>
+        </li>
+        {{else}}
+        <li>Chưa có category nào. Hãy chạy <code>node seed/seedCategories.js</code> để tạo Trong nước / Nước ngoài mặc định.</li>
+        {{/each}}
+    </ul>
+</div>

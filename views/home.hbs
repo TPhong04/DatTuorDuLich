@@ -1,0 +1,144 @@
+<!-- BANNER LỚN -->
+<div class="banner">
+    <img src="/picture/banner_dulich.png" alt="Viet Travel Tour" class="banner-img">
+</div>
+
+<!-- GIỚI THIỆU NGẮN -->
+<div class="container">
+    <div class="brand-intro">
+        <h2 class="brand-intro-title">VIET TRAVEL TOUR</h2>
+        <div class="divider"></div>
+        <p class="brand-intro-text">
+            Viet Travel Tour mang đến những hành trình khám phá trọn vẹn, an toàn và
+            đáng nhớ trên khắp mọi miền đất nước. Từ tour trong nước đến các chuyến
+            đi nước ngoài, mỗi lịch trình đều được chọn lọc kỹ càng, phục vụ
+            khách hàng bằng sự tận tâm và chuyên nghiệp.
+        </p>
+    </div>
+
+    <!-- VÌ SAO NÊN CHỌN -->
+    <div class="section-head">
+        <span class="subtitle">Vì sao nên</span>
+        <h2 class="section-title">CHỌN VIET TRAVEL TOUR?</h2>
+        <div class="divider"></div>
+    </div>
+
+    <div class="why-grid">
+        {{#each whyChooseUs}}
+        <div class="why-card">
+            <div class="why-icon">
+                {{#if (eq this.icon "coffee")}}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 11l19-9-9 19-2-8-8-2z"></path>
+                </svg>
+                {{/if}}
+                {{#if (eq this.icon "heart")}}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.6z"></path>
+                </svg>
+                {{/if}}
+                {{#if (eq this.icon "clock")}}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                {{/if}}
+            </div>
+            <h3 class="why-title">{{this.title}}</h3>
+            <p class="why-desc">{{this.desc}}</p>
+        </div>
+        {{/each}}
+    </div>
+
+    <!-- 2 KHỐI QUẢNG BÁ -->
+    <div class="promo-row">
+        <div class="promo-card promo-card-image">
+            <img src="/picture/trongnuoc.png" alt="Tour trong nước">
+            <div class="promo-content">
+                <span class="promo-label">Khám phá Việt Nam</span>
+                <h3>TOUR TRONG NƯỚC</h3>
+                <p>Hạ Long, Đà Lạt, Phú Quốc, Sapa... những điểm đến đẹp nhất Việt Nam đang chờ bạn khám phá.</p>
+                <a href="/about" class="btn-primary">Tìm hiểu thêm</a>
+            </div>
+        </div>
+
+        <div class="promo-card promo-card-solid">
+            <img src="/picture/nuocngoai.png" alt="Tour nước ngoài">
+            <div class="promo-content">
+                <span class="promo-label">Đặt tour nhanh chóng</span>
+                <h3>TOUR NƯỚC NGOÀI</h3>
+                <p>Chọn điểm đến yêu thích, đặt tour dễ dàng, lịch trình chi tiết, hỗ trợ tận tâm suốt hành trình.</p>
+                <a href="#menu" class="btn-secondary btn-on-solid">Xem tour</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var cards = document.querySelectorAll('.promo-row .promo-card');
+        if (!cards.length) return;
+
+        var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            } else {
+            entry.target.classList.remove('in-view');
+            }
+        });
+        }, {
+        threshold: 0.2 // hiện khi ~20% phần tử lọt vào khung nhìn
+        });
+
+        cards.forEach(function (card) {
+        observer.observe(card);
+        });
+    })();
+    </script>
+
+    <!-- DANH SÁCH TOUR -->
+    <div class="section-head" id="menu">
+        <span class="subtitle">Khám phá</span>
+        <h2 class="section-title">CÁC TOUR NỔI BẬT</h2>
+        <div class="divider"></div>
+    </div>
+
+    <div class="category-tabs">
+        <a href="#" class="category-btn active">Tất cả</a>
+        <a href="#" class="category-btn">Trong nước</a>
+        <a href="#" class="category-btn">Nước ngoài</a>
+        <a href="#" class="category-btn">Combo</a>
+    </div>
+
+    <div class="product-grid">
+        {{#each products}}
+        <div class="product-card">
+            <div class="product-img-wrap">
+                <img src="{{this.image}}" alt="{{this.name}}" class="product-img">
+            </div>
+            <div class="product-info">
+                <h5 class="product-name">{{this.name}}</h5>
+                <p class="product-category">{{this.category}}</p>
+                <p class="product-price">{{this.price}}đ</p>
+                <button class="btn-primary btn-block">Đặt tour ngay</button>
+            </div>
+        </div>
+        {{else}}
+        <div class="product-card empty-card">
+            <p>Tour đang cập nhật, quay lại sau nhé!</p>
+        </div>
+        {{/each}}
+    </div>
+
+    <!-- ĐĂNG KÝ NHẬN ƯU ĐÃI -->
+    <div class="newsletter-box">
+        <div class="newsletter-text">
+            <h3>Đừng bỏ lỡ ưu đãi mới nhất!</h3>
+            <p>Để cập nhật tour mới, khuyến mãi đặc biệt và tin tức từ Viet Travel Tour.</p>
+        </div>
+        <form class="newsletter-form" action="/newsletter" method="POST">
+            <input type="email" name="email" class="form-control" placeholder="Nhập email của bạn" required>
+            <button type="submit" class="btn-primary">Đăng ký</button>
+        </form>
+    </div>
+</div>
