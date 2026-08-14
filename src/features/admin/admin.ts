@@ -1,5 +1,5 @@
-import { apiFetch } from '@/lib/api'
-import { clearStoredAuthRaw, getStoredAccessToken, setStoredAccessToken, setStoredUserRaw } from '@/features/auth/auth.storage'
+import { apiFetch, ensureCsrfTokenForStateChanging, refreshAccessToken } from '@/lib/api'
+import { clearStoredAuthRaw, getStoredAccessToken } from '@/features/auth/auth.storage'
 
 export type AdminUserRole = 'customer' | 'staff' | 'admin'
 export type AdminGender = 'male' | 'female' | 'other' | null
@@ -267,26 +267,22 @@ export async function adminDeleteTour(id: string) {
   return apiFetch<{ ok: true }>(`/admin/tours/${id}`, { method: 'DELETE' })
 }
 
-async function refreshAccessToken() {
-  const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
-  if (!res.ok) return null
-  const data = (await res.json()) as { accessToken: string; user: unknown }
-  setStoredAccessToken(data.accessToken)
-  setStoredUserRaw(JSON.stringify(data.user))
-  return data.accessToken
-}
-
 export async function adminUploadImage(input: { file: File; category: string }) {
   const form = new FormData()
   form.set('file', input.file)
 
   const doFetch = async (canRetry: boolean) => {
     const accessToken = getStoredAccessToken()
+    const csrf = await ensureCsrfTokenForStateChanging('POST')
+    const headers: Record<string, string> = {}
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+    if (csrf) headers['X-XSRF-TOKEN'] = csrf
+
     const res = await fetch(`/api/admin/uploads/image?category=${encodeURIComponent(input.category)}`, {
       method: 'POST',
       body: form,
       credentials: 'include',
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      headers,
     })
 
     if (res.status === 401 && canRetry) {

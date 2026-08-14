@@ -96,11 +96,13 @@ export type PublicTourDetail = PublicTourCard & {
   reviews: PublicTourReview[]
 }
 
-export async function getPublicTours(params?: { q?: string; region?: string; tag?: string }) {
+export async function getPublicTours(params?: { q?: string; region?: string; tag?: string; transport?: string; view?: string }) {
   const qs = new URLSearchParams()
   if (params?.q) qs.set('q', params.q)
   if (params?.region) qs.set('region', params.region)
   if (params?.tag) qs.set('tag', params.tag)
+  if (params?.transport) qs.set('transport', params.transport)
+  if (params?.view) qs.set('view', params.view)
   const qStr = qs.toString()
   return apiFetch<{ items: PublicTourCard[] }>(qStr ? `/tours?${qStr}` : '/tours')
 }

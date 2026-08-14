@@ -199,7 +199,6 @@ export default function NewsPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-orange-50/60 text-slate-900">
       <div className="mx-auto w-full max-w-[1640px] px-4 py-8 2xl:px-6">
         <PageHeader
-          subtitle={`${used.totalRows.toLocaleString('vi-VN')} bài viết tin tức • Cập nhật lúc ${fmtDate(new Date().toISOString())}`}
           title="📰 Tin tức & Kinh nghiệm du lịch"
         />
 

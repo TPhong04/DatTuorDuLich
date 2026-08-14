@@ -1,11 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
+import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule'
 import { Model, Types } from 'mongoose'
+import { JwtPayload } from '../auth/auth.types'
 import { NotificationsService, CreateNotificationInput } from '../notifications/notifications.service'
 import { NotificationType } from '../notifications/notification.schema'
 import { Booking, BookingDocument, BookingStatus, BookingTourSnapshot, BookingPassenger, BookingSurchargeLine } from './booking.schema'
 import { CreateBookingPayload, ListBookingsQuery, UpdateBookingStatusPayload } from './dto'
 import { Tour, TourDocument, TourDeparture } from '../tours/tour.schema'
+import { TransactionsService } from '../transactions/transactions.service'
 // #region debug-point booking-create-500
 import { dbg } from '../_dbg'
 // #endregion
@@ -39,7 +42,22 @@ export class BookingsService {
     @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
     @InjectModel(Tour.name) private readonly tourModel: Model<TourDocument>,
     private readonly notifications: NotificationsService,
-  ) {}
+    private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly transactions: TransactionsService,
+  ) {
+    try {
+      const { CronJob } = require('cron') as typeof import('cron')
+      const job = CronJob.from({
+        cronTime: process.env.BOOKING_HOLD_CRON || '0 */2 * * * *',
+        onTick: () => void this.releaseExpiredHolds().catch(() => undefined),
+        timeZone: 'Asia/Ho_Chi_Minh',
+      })
+      schedulerRegistry.addCronJob('booking_release_expired_holds', job)
+      job.start()
+    } catch (_err) {
+      // noop
+    }
+  }
 
   async generateBookingCode(attempt = 0): Promise<string> {
     if (attempt > 8) throw new ConflictException('Không sinh được mã đặt chỗ, vui lòng thử lại.')
@@ -122,6 +140,117 @@ export class BookingsService {
     return { subtotalAmount: subtotal, surchargeAmount: surcharge, vatAmount: vat, totalAmount: subtotal + surcharge + vat }
   }
 
+  assertStaffOwnershipOrAdmin(actor: JwtPayload, booking: BookingDocument, actionLabel = 'thay đổi đơn này'): void {
+    if (!actor) throw new ForbiddenException('Thiếu thông tin người dùng')
+    const role = String(actor.role || '').toLowerCase()
+    if (role === 'admin') return
+    if (role !== 'staff') throw new ForbiddenException('Bạn không có quyền thực hiện hành động này')
+    const staffId = String(actor.sub)
+    const assigned = Array.isArray(booking.assignedStaffIds) ? booking.assignedStaffIds.map((x) => String(x)) : []
+    const updatedById = (booking as any).updatedByStaffId ? String((booking as any).updatedByStaffId) : null
+    const found = assigned.includes(staffId) || updatedById === staffId
+    if (!found) throw new ForbiddenException(`Bạn không được ${actionLabel} vì đơn này không được giao phụ trách cho bạn.`)
+  }
+
+  ageAtDeparture(birth: Date | null | undefined, dep: TourDeparture): number | null {
+    if (!birth) return null
+    const b = birth instanceof Date ? birth : new Date(birth as any)
+    if (Number.isNaN(b.getTime())) return null
+    const at = dep.departureDate instanceof Date ? dep.departureDate : new Date(dep.departureDate as any)
+    if (Number.isNaN(at.getTime())) return null
+    let years = at.getFullYear() - b.getFullYear()
+    const m = at.getMonth() - b.getMonth()
+    if (m < 0 || (m === 0 && at.getDate() < b.getDate())) years -= 1
+    return years
+  }
+
+  assertPassengerAgeRangesByDeparture(
+    passengers: BookingPassenger[],
+    dep: TourDeparture,
+    adultCountExpected: number,
+    childCountExpected: number,
+    infantCountExpected: number,
+  ): void {
+    if (!Array.isArray(passengers)) return
+    const issues: string[] = []
+    for (let i = 0; i < passengers.length; i += 1) {
+      const p = passengers[i]
+      if (!p) continue
+      const age = this.ageAtDeparture(p.birthDate as any, dep)
+      const idxLabel = `Hành khách #${i + 1}${p.fullName ? ' (' + String(p.fullName).slice(0, 24) + ')' : ''}`
+      if (age === null) continue
+      const type = String(p.type || 'NL')
+      if (age < 2) {
+        if (type !== 'EB') {
+          issues.push(
+            `${idxLabel}: ${age} tuổi (tính theo ngày khởi hành) phải là loại EB (em bé dưới 2 tuổi). Hiện đang đặt loại ${type} → sai phí vé (có thể chênh lệch đến -40%~-75% giá vé).`,
+          )
+        }
+      } else if (age <= 12) {
+        if (type !== 'TE') {
+          issues.push(
+            `${idxLabel}: ${age} tuổi (tính theo ngày khởi hành) phải là loại TE (trẻ em từ 2 đến 12 tuổi). Hiện đang đặt loại ${type} → sai giá vé (TE thường bằng 70%~85% giá NL).`,
+          )
+        }
+      } else {
+        if (type !== 'NL') {
+          issues.push(
+            `${idxLabel}: ${age} tuổi (tính theo ngày khởi hành) phải là loại NL (người lớn ≥ 13 tuổi). Hiện đang đặt loại ${type} → giá thấp hơn thực tế gây thiếu thu.`,
+          )
+        }
+      }
+    }
+    if (issues.length > 0) {
+      throw new BadRequestException('Dữ liệu hành khách cần điều chỉnh theo chuẩn ngành du lịch (2 tuổi TE, <2 tuổi EB, ≥13 tuổi NL):\n' + issues.join('\n'))
+    }
+  }
+
+  async staffListBookings(actor: JwtPayload, query: ListBookingsQuery) {
+    if (!actor) throw new ForbiddenException('Thiếu thông tin người dùng')
+    const role = String(actor.role || '').toLowerCase()
+    const staffOid = (() => { try { return new Types.ObjectId(String(actor.sub)) } catch { return null } })()
+    if (role === 'admin') return this.adminListBookings(query)
+    if (role !== 'staff') throw new ForbiddenException('Bạn không có quyền xem danh sách này')
+    if (!staffOid) throw new BadRequestException('Thông tin nhân viên không hợp lệ')
+    const filter: any = {
+      $or: [
+        { assignedStaffIds: staffOid },
+        { updatedByStaffId: staffOid },
+      ],
+    }
+    if (query.status) filter.status = query.status
+    if (query.from) { filter.createdAt = filter.createdAt || {}; filter.createdAt.$gte = new Date(query.from as string) }
+    if (query.to) { filter.createdAt = filter.createdAt || {}; filter.createdAt.$lte = new Date(new Date(query.to as string).getTime() + 23 * 3600 * 1000 + 59 * 60 * 1000 + 999) }
+    if (query.q) {
+      const qr = new RegExp(String(query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      filter.$and = (filter.$and || []).concat([{
+        $or: [{ code: qr }, { 'tourSnapshot.title': qr }, { 'contact.name': qr }, { 'contact.phone': qr }, { 'contact.email': qr }],
+      }])
+    }
+    const page = Math.max(1, Number(query.page) || 1)
+    const limit = Math.min(100, Math.max(5, Number(query.limit) || 20))
+    const skip = (page - 1) * limit
+    const [items, total] = await Promise.all([
+      this.bookingModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
+      this.bookingModel.countDocuments(filter),
+    ])
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+  }
+
+  async getOneScoped(idOrCode: string, actor: JwtPayload | null): Promise<BookingDocument> {
+    const doc = await this.findByCodeOrId(idOrCode)
+    if (!actor) return doc
+    const role = String(actor.role || '').toLowerCase()
+    if (role === 'admin') return doc
+    if (role === 'staff') {
+      this.assertStaffOwnershipOrAdmin(actor, doc, 'xem chi tiết đơn này')
+      return doc
+    }
+    const userOid = String(actor.sub)
+    if (String(doc.createdBy || '') === userOid) return doc
+    throw new ForbiddenException('Bạn không có quyền xem đơn này')
+  }
+
   assertPassengersMatchCounts(payload: CreateBookingPayload) {
     const isGroup = Boolean((payload as any).isGroupTour)
     if (isGroup) return
@@ -146,13 +275,66 @@ export class BookingsService {
     await dbg('svc.find_dep', { depIdFromPayload: payload.departureId, departuresN: tour.departures?.length ?? 0, firstFewIds: (tour.departures ?? []).slice(0, 6).map((d: any, i: number) => ({ i, id: d?._id?.toString?.() ?? String(d?.id ?? d?._id ?? i), date: (d as any).departureDate, status: (d as any).status, seats: (d as any).seatsAvailable })) })
     // #endregion
     const { idx, dep, depIdSafe } = await this.findDepartureWithinTour(tour, payload.departureId)
-    if (dep.status === 'closed' || dep.status === 'cancelled' || dep.status === 'soldout') {
+    const totalGuests = (payload.adultCount || 0) + (payload.childCount || 0) + (payload.infantCount || 0)
+    if (totalGuests <= 0) throw new BadRequestException('Cần ít nhất 1 hành khách.')
+    const depIdStr = depIdSafe ? depIdSafe.toString() : null
+    const depIdx = idx
+    const depStatus = String((dep as any).status || 'open')
+    if (depStatus === 'closed' || depStatus === 'cancelled' || depStatus === 'soldout') {
       throw new BadRequestException('Đợt khởi hành này đã đóng bán, vui lòng chọn đợt khác.')
     }
-    const totalGuests = (payload.adultCount || 0) + (payload.childCount || 0) + (payload.infantCount || 0)
     if (typeof dep.seatsAvailable === 'number' && totalGuests > dep.seatsAvailable) {
       throw new BadRequestException(`Số chỗ còn lại chỉ ${dep.seatsAvailable}, không đủ cho ${totalGuests} hành khách.`)
     }
+
+    this.assertPassengerAgeRangesByDeparture(payload.passengers as any, dep, payload.adultCount || 0, payload.childCount || 0, payload.infantCount || 0)
+
+    // --- BUG-001 FIX: Atomic Seats Lock (Optimistic + Pessimistic atomic update) ---
+    // Filter: match tour + specific departure by _id/idx + seatsAvailable>=totalGuests + status NOT closed/cancelled/soldout
+    const seatFilter: any = { _id: tour._id }
+    if (depIdStr && Types.ObjectId.isValid(depIdStr)) {
+      seatFilter['departures._id'] = new Types.ObjectId(depIdStr)
+      seatFilter['departures'] = {
+        $elemMatch: {
+          _id: new Types.ObjectId(depIdStr),
+          seatsAvailable: { $gte: totalGuests },
+          status: { $nin: ['closed', 'cancelled', 'soldout'] },
+        },
+      }
+    } else {
+      seatFilter['departures'] = {
+        $elemMatch: {
+          seatsAvailable: { $gte: totalGuests },
+          status: { $nin: ['closed', 'cancelled', 'soldout'] },
+        },
+      }
+      // fallback match idx by numeric index
+      const arr: any[] = Array.isArray((tour as any).departures) ? (tour as any).departures : []
+      if (depIdx >= 0 && depIdx < arr.length) {
+        const exactId = (arr[depIdx] as any)?._id
+        if (exactId instanceof Types.ObjectId) {
+          seatFilter['departures._id'] = exactId
+          seatFilter['departures'] = {
+            $elemMatch: { _id: exactId, seatsAvailable: { $gte: totalGuests }, status: { $nin: ['closed', 'cancelled', 'soldout'] } },
+          }
+        }
+      }
+    }
+    const atomicSeatsUpdate = await this.tourModel.updateOne(seatFilter, {
+      $inc: {
+        [`departures.${depIdx}.seatsAvailable`]: -totalGuests,
+        totalBookings: 1,
+      },
+    }).exec()
+    if (!atomicSeatsUpdate.acknowledged) {
+      throw new ConflictException('Hệ thống thanh toán tạm thời bận, vui lòng thử lại.')
+    }
+    if (atomicSeatsUpdate.matchedCount === 0 || atomicSeatsUpdate.modifiedCount === 0) {
+      throw new ConflictException(
+        `Đợt khởi hành này chỉ còn ${(tour.departures as any)[depIdx]?.seatsAvailable ?? 0} chỗ. Có ${totalGuests} khách cùng đặt, bạn vui lòng chọn đợt khác hoặc giảm số lượng hành khách.`
+      )
+    }
+
     const snapshot: BookingTourSnapshot = {
       title: tour.title,
       slug: tour.slug,
@@ -187,56 +369,65 @@ export class BookingsService {
       unitPrice: Math.max(0, Number(s?.unitPrice) || 0),
       note: typeof s?.note === 'string' ? s.note.trim() || null : null,
     }))
-    const doc = await this.bookingModel.create({
-      code,
-      tourId: tour._id,
-      tourSnapshot: snapshot,
-      departureId: depIdSafe,
-      departureDate,
-      departureStandardText: dep.standardText ?? null,
-      adultCount: payload.adultCount || 0,
-      childCount: payload.childCount || 0,
-      infantCount: payload.infantCount || 0,
-      priceAdultSnapshot: dep.priceAdult || 0,
-      priceChildSnapshot: typeof dep.priceChild === 'number' ? dep.priceChild : null,
-      priceInfantSnapshot: typeof dep.priceInfant === 'number' ? dep.priceInfant : null,
-      contact: {
-        name: String(payload.contact?.name || '').trim(),
-        phone: String(payload.contact?.phone || '').trim(),
-        email: typeof payload.contact?.email === 'string' ? payload.contact.email.trim() || null : null,
-        address: typeof payload.contact?.address === 'string' ? payload.contact.address.trim() || null : null,
-      },
-      passengers: passengersClean,
-      notes: typeof payload.notes === 'string' ? payload.notes.trim() || null : null,
-      surcharges: surchargesClean,
-      subtotalAmount: totals.subtotalAmount,
-      surchargeAmount: totals.surchargeAmount,
-      vatAmount: totals.vatAmount,
-      totalAmount: totals.totalAmount,
-      currency: 'VND',
-      paymentMethod: payload.paymentMethod || 'hold',
-      paymentStatus: payload.paymentMethod === 'online' ? 'partial' : 'unpaid',
-      createdBy,
-      status: 'new',
-      holdsUntil,
-      isGroupTour: isGroup,
-      groupCompanyName: typeof (payload as any).groupCompanyName === 'string' ? (payload as any).groupCompanyName.trim() || null : null,
-      groupContactPerson: typeof (payload as any).groupContactPerson === 'string' ? (payload as any).groupContactPerson.trim() || null : null,
-      groupContactRole: typeof (payload as any).groupContactRole === 'string' ? (payload as any).groupContactRole.trim() || null : null,
-      groupUploadedListFileUrl: typeof (payload as any).groupUploadedListFileUrl === 'string' ? (payload as any).groupUploadedListFileUrl.trim() || null : null,
-      groupNote: typeof (payload as any).groupNote === 'string' ? (payload as any).groupNote.trim() || null : null,
-    } as any)
+    let doc: BookingDocument | null = null
+    try {
+      doc = await this.bookingModel.create({
+        code,
+        tourId: tour._id,
+        tourSnapshot: snapshot,
+        departureId: depIdSafe,
+        departureDate,
+        departureStandardText: dep.standardText ?? null,
+        adultCount: payload.adultCount || 0,
+        childCount: payload.childCount || 0,
+        infantCount: payload.infantCount || 0,
+        priceAdultSnapshot: dep.priceAdult || 0,
+        priceChildSnapshot: typeof dep.priceChild === 'number' ? dep.priceChild : null,
+        priceInfantSnapshot: typeof dep.priceInfant === 'number' ? dep.priceInfant : null,
+        contact: {
+          name: String(payload.contact?.name || '').trim(),
+          phone: String(payload.contact?.phone || '').trim(),
+          email: typeof payload.contact?.email === 'string' ? payload.contact.email.trim() || null : null,
+          address: typeof payload.contact?.address === 'string' ? payload.contact.address.trim() || null : null,
+        },
+        passengers: passengersClean,
+        notes: typeof payload.notes === 'string' ? payload.notes.trim() || null : null,
+        surcharges: surchargesClean,
+        subtotalAmount: totals.subtotalAmount,
+        surchargeAmount: totals.surchargeAmount,
+        vatAmount: totals.vatAmount,
+        totalAmount: totals.totalAmount,
+        currency: 'VND',
+        paymentMethod: payload.paymentMethod || 'hold',
+        paymentStatus: payload.paymentMethod === 'online' ? 'partial' : 'unpaid',
+        createdBy,
+        status: 'new',
+        holdsUntil,
+        isGroupTour: isGroup,
+        groupCompanyName: typeof (payload as any).groupCompanyName === 'string' ? (payload as any).groupCompanyName.trim() || null : null,
+        groupContactPerson: typeof (payload as any).groupContactPerson === 'string' ? (payload as any).groupContactPerson.trim() || null : null,
+        groupContactRole: typeof (payload as any).groupContactRole === 'string' ? (payload as any).groupContactRole.trim() || null : null,
+        groupUploadedListFileUrl: typeof (payload as any).groupUploadedListFileUrl === 'string' ? (payload as any).groupUploadedListFileUrl.trim() || null : null,
+        groupNote: typeof (payload as any).groupNote === 'string' ? (payload as any).groupNote.trim() || null : null,
+      } as any)
+    } catch (createErr) {
+      try {
+        await this.tourModel.updateOne({ _id: tour._id }, {
+          $inc: {
+            [`departures.${depIdx}.seatsAvailable`]: +totalGuests,
+            totalBookings: -1,
+          },
+        }).exec()
+      } catch { /* swallow compensation rollback error */ }
+      throw createErr
+    }
     // #region debug-point booking-create-500
     await dbg('svc.doc_created', { code, _id: doc._id?.toString?.() ?? null })
     // #endregion
-    ;(tour.departures as any)[idx] = {
-      ...dep,
-      seatsAvailable: Math.max(0, (dep.seatsAvailable || 0) - totalGuests),
-      seatsTotal: dep.seatsTotal,
-    } as any
-    tour.totalBookings = Number(tour.totalBookings || 0) + 1
-    await tour.save()
     try { await this.emitBookingCreatedNotifications(doc) } catch {}
+    try { await this.transactions.recordSaleFromBooking(doc, { createdById: createdBy ?? null }) } catch (_errTxn) {
+      // best effort, booking creation already committed — no throw
+    }
     return doc
   }
 
@@ -316,8 +507,20 @@ export class BookingsService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 
-  async updateStatus(idOrCode: string, payload: UpdateBookingStatusPayload): Promise<BookingDocument> {
+  async updateStatus(idOrCode: string, payload: UpdateBookingStatusPayload, actor: JwtPayload | null = null): Promise<BookingDocument> {
     const booking = await this.findByCodeOrId(idOrCode)
+    if (actor) {
+      const role = String(actor.role || '').toLowerCase()
+      if (role === 'staff') {
+        this.assertStaffOwnershipOrAdmin(actor, booking, 'cập nhật trạng thái đơn này')
+      } else if (role !== 'admin') {
+        if (String(booking.createdBy || '') !== String(actor.sub)) {
+          throw new ForbiddenException('Bạn không có quyền cập nhật trạng thái đơn này')
+        }
+      }
+      const staffOid = String(actor.role || '').toLowerCase() === 'staff' ? new Types.ObjectId(String(actor.sub)) : null
+      if (staffOid) booking.set('updatedByStaffId', staffOid)
+    }
     const prevStatus = booking.status
     const nextStatus = payload.status as BookingStatus
     if (nextStatus === 'cancelled' && prevStatus !== 'cancelled') {
@@ -358,6 +561,12 @@ export class BookingsService {
     booking.status = nextStatus
     if (typeof payload.adminNote === 'string' && payload.adminNote) booking.adminNote = payload.adminNote
     const saved = await booking.save()
+    try {
+      if (nextStatus === 'cancelled') {
+        const actorId = actor && actor.sub ? new Types.ObjectId(String(actor.sub)) : null
+        await this.transactions.recordRefundFromCancelledBooking(saved, { createdById: actorId, narration: payload.adminNote || undefined }).catch(() => undefined)
+      }
+    } catch { /* best effort */ }
     try { await this.emitBookingStatusChanged(prevStatus, saved) } catch {}
     return saved
   }
@@ -592,5 +801,75 @@ export class BookingsService {
     }
 
     if (list.length) await this.notifications.bulk(list)
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES, {
+    name: 'booking_auto_release_hold_fallback',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  })
+  async releaseExpiredHoldsCronFallback() {
+    try { await this.releaseExpiredHolds() } catch { /* noop */ }
+  }
+
+  async releaseExpiredHolds(): Promise<{ processed: number; released: number; returnedSeats: number; errors: number }> {
+    const out = { processed: 0, released: 0, returnedSeats: 0, errors: 0 }
+    const now = new Date()
+    const holdStatuses: BookingStatus[] = ['new', 'pending']
+    const cursor = this.bookingModel.find({
+      status: { $in: holdStatuses as any },
+      holdsUntil: { $exists: true, $ne: null, $lte: now },
+      paymentStatus: { $in: ['unpaid'] as any },
+      isGroupTour: { $ne: true },
+    }).cursor({ batchSize: 50 })
+    for (let doc = await cursor.next(); doc != null; doc = await cursor.next()) {
+      try {
+        out.processed += 1
+        const b = doc as BookingDocument
+        const totalGuests = (b.adultCount || 0) + (b.childCount || 0) + (b.infantCount || 0)
+        const tourId = b.tourId
+        const depId = b.departureId?.toString?.() || String((b as any).departureId)
+        if (tourId && depId && totalGuests > 0) {
+          try {
+            const depIdxFilter: any = {}
+            try {
+              depIdxFilter['departures._id'] = new Types.ObjectId(depId)
+              depIdxFilter['departures'] = {
+                $elemMatch: { _id: new Types.ObjectId(depId) },
+              }
+            } catch {
+              /* invalid depId skip dep update */
+            }
+            if (Object.keys(depIdxFilter).length > 0) {
+              const res = await this.tourModel.updateOne(
+                { _id: tourId, ...depIdxFilter },
+                {
+                  $inc: {
+                    'departures.$.seatsAvailable': +totalGuests,
+                    totalBookings: -1,
+                  },
+                },
+              ).exec()
+              if (res.acknowledged && res.matchedCount > 0) out.returnedSeats += totalGuests
+            }
+          } catch {
+            /* swallow seat return error (process next booking) */
+          }
+        }
+        const prevStatus = String(b.status || 'new') as BookingStatus
+        b.status = 'expired'
+        b.adminNote = [
+          b.adminNote ? String(b.adminNote) + ' · ' : '',
+          `[Auto][${now.toLocaleString('vi-VN')}] Hết thời gian giữ chỗ (holdsUntil=${new Date((b as any).holdsUntil || now).toLocaleString('vi-VN')}). Tự động trả lại chỗ.`,
+        ].join('')
+        const saved = await b.save()
+        try { await this.transactions.recordReleaseHold(saved).catch(() => undefined) } catch { /* noop */ }
+        try { await this.emitBookingStatusChanged(prevStatus, saved) } catch { /* noop */ }
+        out.released += 1
+      } catch {
+        out.errors += 1
+      }
+    }
+    try { await cursor.close?.() } catch { /* noop */ }
+    return out
   }
 }

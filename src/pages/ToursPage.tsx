@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
 import PageHeader from '@/components/ui/PageHeader'
@@ -14,13 +14,20 @@ function formatMoney(n: number | null | undefined) {
 
 export default function ToursPage() {
   const toast = useToast()
+  const [sp] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<PublicTourCard[]>([])
+
+  const q = sp.get('q') || undefined
+  const region = sp.get('region') || undefined
+  const tag = sp.get('tag') || undefined
+  const transport = sp.get('transport') || undefined
+  const view = sp.get('view') || undefined
 
   useEffect(() => {
     let alive = true
     setLoading(true)
-    getPublicTours()
+    getPublicTours({ q, region, tag, transport, view })
       .then((r) => {
         if (!alive) return
         setItems(Array.isArray(r.items) ? r.items : [])
@@ -33,13 +40,12 @@ export default function ToursPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [q, region, tag, transport, view])
 
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Lọc theo: điểm đến, ngày khởi hành, giá, thời lượng, phương tiện, khởi hành từ."
-        title="Tour trong nước"
+        title="Tìm tour du lịch"
       />
       <div className="grid gap-4 md:grid-cols-3">
         {items.map((t) => {
@@ -52,19 +58,38 @@ export default function ToursPage() {
               key={t.id}
               to={`/tours/${t.slug}`}
             >
-              <div className="aspect-[16/9] bg-slate-100">
+              <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 ring-1 ring-inset ring-slate-200/70">
                 {t.coverImageUrl ? (
-                  <img alt={t.title} className="h-full w-full object-cover transition group-hover:scale-[1.02]" src={t.coverImageUrl} />
+                  <div className="relative h-full w-full">
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute inset-0 h-full w-full',
+                        'scale-110 blur-2xl opacity-40 saturate-150',
+                        'object-cover',
+                      )}
+                      src={t.coverImageUrl}
+                    />
+                    <img
+                      alt={t.title}
+                      className={cn(
+                        'relative z-10 h-full w-full transition duration-500 ease-out group-hover:scale-[1.04]',
+                        'object-contain',
+                      )}
+                      src={t.coverImageUrl}
+                    />
+                  </div>
                 ) : (
                   <div className="h-full w-full" />
                 )}
                 {discount ? (
-                  <span className="absolute left-3 top-3 inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-md shadow-orange-500/30">
+                  <span className="absolute left-3 top-3 z-20 inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-md shadow-orange-500/30 ring-1 ring-inset ring-white/20">
                     -{discount}%
                   </span>
                 ) : null}
                 {t.themes?.[0] ? (
-                  <span className="absolute right-3 top-3 inline-flex rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-black/5">
+                  <span className="absolute right-3 top-3 z-20 inline-flex rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-black/5 backdrop-blur">
                     {t.themes[0]}
                   </span>
                 ) : null}

@@ -54,7 +54,6 @@ export default function GroupTourPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        subtitle="Dịch vụ Tour đoàn cho Công ty, Trường học, Câu lạc bộ, Gia đình lớn — 100% custom lịch trình & dịch vụ theo yêu cầu."
         title="👔 Tour đoàn doanh nghiệp & nhóm lớn"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">

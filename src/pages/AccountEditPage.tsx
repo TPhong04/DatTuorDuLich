@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 
 import { useToast } from '@/components/notifications/ToastProvider'
 import PageHeader from '@/components/ui/PageHeader'
+import { DateInput } from '@/components/ui/DateInput'
 import { fetchProfile, getStoredUser, isAuthed, updateProfile, uploadAvatar } from '@/features/auth/auth'
 import { cn } from '@/lib/utils'
 
@@ -127,8 +128,7 @@ export default function AccountEditPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Cập nhật thông tin cá nhân để đặt tour nhanh hơn."
-        title="Chỉnh sửa tài khoản"
+        title="Chỉnh sửa thông tin cá nhân"
         right={
           <button
             className="inline-flex rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
@@ -219,12 +219,16 @@ export default function AccountEditPage() {
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
               <div className="text-sm font-semibold text-slate-900">Ngày sinh</div>
-              <input
-                className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                type="date"
-                value={dateOfBirth}
-              />
+              <div className="mt-2">
+                <DateInput
+                  size="lg"
+                  variant="customer"
+                  value={dateOfBirth || null}
+                  disabledFuture
+                  onChange={(iso) => setDateOfBirth(iso || '')}
+                  placeholder="Chọn ngày sinh"
+                />
+              </div>
             </label>
             <label className="block">
               <div className="text-sm font-semibold text-slate-900">CCCD/CMND</div>

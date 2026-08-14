@@ -37,7 +37,7 @@ export default function RegisterPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <PageHeader subtitle="Tạo tài khoản để đặt tour và theo dõi hóa đơn." title="Đăng ký" />
+      <PageHeader title="Đăng ký" />
       <form
         className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
         onSubmit={onSubmit}

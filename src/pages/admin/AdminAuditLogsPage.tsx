@@ -309,7 +309,7 @@ export default function AdminAuditLogsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Theo dõi thao tác quản trị: tài khoản, cấu hình, upload, banner..." title="Audit logs" />
+      <PageHeader title="Audit logs" />
       <div className="rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100">
         <div className="grid gap-3 md:grid-cols-4">
           <label className="block">

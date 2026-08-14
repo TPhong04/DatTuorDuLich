@@ -22,6 +22,18 @@ function createId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
 }
 
+function shouldSuppress(message: string | null | undefined): boolean {
+  if (!message) return true
+  const m = String(message)
+  if (m.length === 0) return true
+  const normalized = m.replace(/\s+/g, ' ').trim().toLowerCase()
+  if (normalized.includes('throttler')) return true
+  if (normalized.includes('too many requests')) return true
+  if (normalized.includes('429')) return true
+  if (normalized.includes('rate limit')) return true
+  return false
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const timersRef = useRef<Map<string, number>>(new Map())
@@ -37,6 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback(
     (variant: ToastVariant, message: string) => {
+      if (shouldSuppress(message)) return
       const id = createId()
       setToasts((prev) => [...prev, { id, variant, message }])
       const timer = window.setTimeout(() => remove(id), 3500)

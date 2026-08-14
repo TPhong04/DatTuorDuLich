@@ -165,7 +165,6 @@ export default function StaffContentReviewsPage() {
   return (
     <div className={cn('space-y-6', stale && 'opacity-80 blur-[0.4px] transition-opacity')} style={{ minHeight: initialLoading ? 1800 : undefined }}>
       <PageHeader
-        subtitle="Xem & xử lý các bài đánh giá tiêu cực / phản cảm được admin giao cho bạn. Bạn chỉ được sửa/xóa những bài đã được admin bật cờ."
         title="Đánh giá (Staff)"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import PageHeader from '@/components/ui/PageHeader'
+import { DateRangeInput } from '@/components/ui/DateRangeInput'
 import { useToast } from '@/components/notifications/ToastProvider'
 import {
   Booking,
@@ -175,7 +176,6 @@ export default function StaffBookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Xử lý đơn đặt tour: xác nhận, hủy, ghi chú nội bộ, theo dõi thanh toán & hỗ trợ khách hàng."
         title="Xử lý Đơn đặt"
         right={
           <div className="flex items-center gap-2">
@@ -218,15 +218,17 @@ export default function StaffBookingsPage() {
               <option value="cancelled">Đã hủy</option>
             </select>
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Từ ngày</label>
-            <input type="date" value={fFrom} max={fTo || undefined} onChange={(e) => setFFrom(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
+          <div className="md:col-span-5">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Khoảng ngày đặt</label>
+            <DateRangeInput
+              size="md"
+              variant="staff"
+              from={fFrom || null}
+              to={fTo || null}
+              onChange={(next) => { setFFrom(next.from || ''); setFTo(next.to || '') }}
+            />
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Đến ngày</label>
-            <input type="date" value={fTo} min={fFrom || undefined} onChange={(e) => setFTo(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
-          </div>
-          <div className="md:col-span-5 flex items-end gap-2">
+          <div className="md:col-span-7 flex items-end gap-2">
             <div className="min-w-0 flex-1">
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</label>
               <input value={fQ} onChange={(e) => setFQ(e.target.value)} placeholder="Mã / Tour / Tên KH / SĐT / Email" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />

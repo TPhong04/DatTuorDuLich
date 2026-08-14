@@ -33,7 +33,7 @@ export default function AdminSettingsSecurityPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Thiết lập giới hạn đăng nhập và chính sách lưu audit log." title="Bảo mật" />
+      <PageHeader title="Bảo mật" />
       <form className="space-y-4 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <div className="grid gap-4 md:grid-cols-3">
           <label className="block">

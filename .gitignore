@@ -1,29 +1,33 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
 node_modules
 dist
 dist-ssr
-*.local
-.env
-server/.env
 server/dist
-server/node_modules
-server/uploads
-
-# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+*.local
+coverage
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+server/.env
+server/.env.local
+uploads/*
+!uploads/.gitkeep
+.e2e-cache
+# Playwright E2E Step 9 Bước 9: ignore storage, auth cookies state, test artifacts traces videos
+e2e/.auth
+e2e/.state
+e2e/.test-artifacts
+e2e/.report-html
+e2e/*.log
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache
+.cache/ms-playwright
+# Nightly run debug files
+.dbg/*

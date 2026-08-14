@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Ip, UseGuards, Req, Get } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Post, Ip, UseGuards, Req, Get } from '@nestjs/common'
 import { Request } from 'express'
 import { AccessTokenGuard } from '../auth/guards/access-token.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -20,7 +20,7 @@ export class PublicGroupTourRequestsController {
     const parsed = CreateGroupTourRequestZod.safeParse(body)
     if (!parsed.success) {
       const first = parsed.error.errors[0]
-      throw new (await import('@nestjs/common')).BadRequestException(`${first?.path?.join('.') || 'payload'}: ${first?.message || 'Dữ liệu không hợp lệ'}`)
+      throw new BadRequestException(`${first?.path?.join('.') || 'payload'}: ${first?.message || 'Dữ liệu không hợp lệ'}`)
     }
     const user = (req as any).user as JwtPayload | undefined
     const createdBy: Types.ObjectId | null = user && Types.ObjectId.isValid(user.sub) ? new Types.ObjectId(user.sub) : null

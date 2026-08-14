@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api'
+import { ensureCsrfTokenForStateChanging, apiFetch, refreshAccessToken } from '@/lib/api'
 import { clearStoredAuthRaw, getStoredAccessToken, getStoredUserRaw, setStoredAccessToken, setStoredUserRaw } from './auth.storage'
 
 export type AuthUser = {
@@ -25,6 +25,7 @@ export type AuthUser = {
   dietary?: string | null
   medicalNotes?: string | null
   role: 'customer' | 'staff' | 'admin'
+  totpEnabled?: boolean
 }
 
 function emitAuthChanged() {
@@ -61,13 +62,55 @@ export function isAuthed() {
   return Boolean(getStoredAccessToken())
 }
 
-export async function login(input: { email: string; password: string }) {
-  const res = await apiFetch<{ accessToken: string; user: AuthUser }>('/auth/login', {
+export type LoginStep1TfaPending = {
+  totpRequired: true
+  stepToken: string
+  user: { id: string; email: string; role: 'customer' | 'staff' | 'admin'; name?: string; totpEnabled: true }
+}
+
+export type LoginSuccess = {
+  totpRequired?: false
+  accessToken: string
+  user: AuthUser
+}
+
+export async function login(input: { email: string; password: string }): Promise<LoginStep1TfaPending | LoginSuccess> {
+  const res = await apiFetch<LoginStep1TfaPending | LoginSuccess>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (res && (res as LoginSuccess).accessToken && !(res as LoginStep1TfaPending).totpRequired) {
+    setStoredAuth(res as LoginSuccess)
+  }
+  return res
+}
+
+export async function totpLoginStep2(input: { stepToken: string; code: string }) {
+  const res = await apiFetch<LoginSuccess>('/auth/2fa/login-step2', {
     method: 'POST',
     body: JSON.stringify(input),
   })
   setStoredAuth(res)
   return res
+}
+
+export async function totpSetup() {
+  return apiFetch<{
+    secretBase32: string
+    otpAuthUrl: string
+    qrDataUrl: string
+    backupCodesUnmasked: string[]
+    issuer: string
+    email: string
+  }>('/auth/2fa/setup', { method: 'POST' })
+}
+
+export async function totpEnable(code: string) {
+  return apiFetch<{ ok: true; enabled: true }>('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) })
+}
+
+export async function totpDisable(password: string) {
+  return apiFetch<{ ok: true; disabled: true }>('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ password }) })
 }
 
 export async function register(input: { name: string; phone?: string; email: string; password: string }) {
@@ -131,26 +174,21 @@ export async function updateProfile(input: {
   return res
 }
 
-async function refreshAccessToken() {
-  const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
-  if (!res.ok) return null
-  const data = (await res.json()) as { accessToken: string; user: unknown }
-  setStoredAccessToken(data.accessToken)
-  setStoredUserRaw(JSON.stringify(data.user))
-  return data.accessToken
-}
-
 export async function uploadAvatar(file: File) {
   const form = new FormData()
   form.set('file', file)
 
   const doFetch = async (canRetry: boolean) => {
     const accessToken = getStoredAccessToken()
+    const csrf = await ensureCsrfTokenForStateChanging('POST')
     const res = await fetch('/api/uploads/avatar', {
       method: 'POST',
       body: form,
       credentials: 'include',
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
+      },
     })
 
     if (res.status === 401 && canRetry && accessToken) {

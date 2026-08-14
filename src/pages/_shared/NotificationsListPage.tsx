@@ -122,11 +122,6 @@ export default function NotificationsListPage({ scope }: { scope: Scope }) {
     <div className="mx-auto max-w-6xl space-y-4 px-3 pb-16 lg:px-5">
       <PageHeader
         title="Thông báo"
-        subtitle={
-          scope === 'admin' ? 'Thông báo hệ thống toàn cục, các sự kiện nghiệp vụ quản trị' :
-          scope === 'staff' ? 'Thông báo nghiệp vụ được giao, báo giá, chốt đơn, nhắc lịch gọi' :
-          `Cập nhật về đơn đặt, tour đoàn của ${user?.name || 'bạn'}`
-        }
         right={
           <div className="flex items-center gap-2">
             <button

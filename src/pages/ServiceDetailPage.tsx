@@ -28,7 +28,7 @@ export default function ServiceDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle={content?.subtitle} title={content?.title ?? 'Dịch vụ'} />
+      <PageHeader title={content?.title ?? 'Dịch vụ'} />
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         Nội dung giới thiệu dịch vụ + form yêu cầu (placeholder).
       </div>

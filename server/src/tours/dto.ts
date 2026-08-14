@@ -73,7 +73,7 @@ export const createTourDto = z.object({
   totalBookings: z.number().int().nonnegative().default(0),
   avgRating: z.number().finite().nonnegative().nullable().optional(),
   reviewCount: z.number().int().nonnegative().default(0),
-  isPublished: z.boolean().default(false),
+  isPublished: z.boolean().default(true),
   tags: z.array(nonEmptyString).default([]),
   itinerary: z.array(itineraryDayDto).default([]),
   priceTable: z.array(priceRowDto).default([]),

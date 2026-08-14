@@ -6,13 +6,16 @@ import { NotificationsService, CreateNotificationInput } from '../notifications/
 import { NotificationType } from '../notifications/notification.schema'
 import { GroupTourRequest, GroupTourRequestDocument, GroupTourRequestStatus } from './group-tour-request.schema'
 import { AdminPatchGroupTourRequestDTO, CreateGroupTourRequestDTO } from './dto'
+import { Booking, BookingDocument, BookingStatus, BookingTourSnapshot, BookingPassenger } from '../bookings/booking.schema'
+import { TodosService } from '../todos/todos.service'
 
 type ListQuery = {
-  status?: GroupTourRequestStatus
+  status?: GroupTourRequestStatus | GroupTourRequestStatus[]
   priority?: 'low' | 'normal' | 'high' | 'urgent'
   assignedStaffId?: string
   mine?: boolean
   searchKeyword?: string
+  minGuests?: number
   page?: number
   pageSize?: number
   sort?: 'newest' | 'oldest' | 'priority' | 'follow_up'
@@ -22,8 +25,10 @@ type ListQuery = {
 export class GroupTourRequestsService {
   constructor(
     @InjectModel(GroupTourRequest.name) private readonly model: Model<GroupTourRequestDocument>,
+    @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
     private readonly audit: AuditLogsService,
     private readonly notifications: NotificationsService,
+    private readonly todos: TodosService,
   ) {}
 
   async generateCode() {
@@ -140,8 +145,17 @@ export class GroupTourRequestsService {
     const pageSize = Math.min(100, Math.max(1, Number(q.pageSize) || 25))
     const skip = (page - 1) * pageSize
     const filter: any = {}
-    if (status) filter.status = status
+    if (Array.isArray(status)) filter.status = { $in: status }
+    else if (status) filter.status = status
     if (q.priority) filter.priority = q.priority
+    if (typeof q.minGuests === 'number' && Number.isFinite(q.minGuests) && q.minGuests > 0) {
+      filter.$expr = {
+        $gte: [
+          { $add: ['$adultCount', { $ifNull: ['$childCount', 0] }, { $ifNull: ['$infantCount', 0] }] },
+          q.minGuests,
+        ],
+      }
+    }
     if (q.mine && actorId) filter.assignedStaffId = actorId
     else if (q.assignedStaffId) {
       if (q.assignedStaffId === 'none') filter.assignedStaffId = null
@@ -230,10 +244,40 @@ export class GroupTourRequestsService {
       if (patch.status === undefined) patch.status = 'lost'
     }
     if (patch.status === 'won' && !patch.wonAt && !doc.wonAt) patch.wonAt = now
-    if (patch.status === 'lost' && !doc.lostAt) patch.lostAt = now
+    if (patch.status === 'lost' && !patch.lostAt) patch.lostAt = now
     if (patch.status === 'converted_booking' && !patch.wonAt && !doc.wonAt) patch.wonAt = now
     const oldSnap = doc.toObject()
+    let autoConvertedBookingId: Types.ObjectId | null = null
+
+    if (patch.status === 'won' && !patch.convertedBookingId && !doc.convertedBookingId) {
+      try {
+        autoConvertedBookingId = await this.createBookingFromWonGroupTourRequest(doc, actorId, actorRole)
+        if (autoConvertedBookingId) {
+          patch.convertedBookingId = autoConvertedBookingId
+          patch.status = 'converted_booking'
+          if (!patch.wonAt) patch.wonAt = now
+        }
+      } catch (e) {
+        try { await this.audit.create({ actorUserId: actorId.toString(), actorEmail: `${actorRole}_${actorId.toString()}@internal.local`, actorRole, action: 'group_tour_request.won_auto_create_booking_failed', entityType: 'group_tour_request', entityId: (doc._id as any)?.toString() ?? null, meta: { code: doc.code, error: String((e as any)?.message || e) } }) } catch {}
+      }
+    }
+
     const updated = await this.model.findByIdAndUpdate(doc._id, { $set: patch }, { new: true }).orFail().exec()
+
+    const wonJustTriggered =
+      (patch.status === 'won' || patch.status === 'converted_booking') &&
+      (doc.status !== 'won' && doc.status !== 'converted_booking')
+    if (wonJustTriggered) {
+      try {
+        await this.todos.createBulkTodoForWonGroupTourRequest({
+          gtr: updated,
+          bookingId: autoConvertedBookingId,
+          actorId,
+        })
+      } catch (errTodo) {
+        try { await this.audit.create({ actorUserId: actorId.toString(), actorEmail: `${actorRole}_${actorId.toString()}@internal.local`, actorRole, action: 'group_tour_request.won_auto_create_todos_failed', entityType: 'group_tour_request', entityId: (doc._id as any)?.toString() ?? null, meta: { code: doc.code, error: String((errTodo as any)?.message || errTodo) } }) } catch {}
+      }
+    }
     await this.audit.create({
       actorUserId: actorId.toString(),
       actorEmail: `${actorRole}_${actorId.toString()}@internal.local`,
@@ -241,10 +285,145 @@ export class GroupTourRequestsService {
       action: 'group_tour_request.update',
       entityType: 'group_tour_request',
       entityId: (doc._id as any)?.toString() ?? null,
-      meta: { patch, old: oldSnap, code: doc.code, autoTransitioned: hasNewQuote ? 'quoting' : (patch.status === 'lost' ? 'lost' : (patch.status === 'won' ? 'won' : null)) },
+      meta: {
+        patch,
+        old: oldSnap,
+        code: doc.code,
+        autoCreatedBookingId: autoConvertedBookingId ? autoConvertedBookingId.toString() : null,
+        autoTransitioned: hasNewQuote ? 'quoting' : (patch.status === 'lost' ? 'lost' : (patch.status === 'converted_booking' && autoConvertedBookingId ? 'won_to_converted_booking' : (patch.status === 'won' ? 'won' : null))),
+      },
     })
-    try { await this.emitGtrNotifications({ before: oldSnap as any, after: updated.toObject(), actorId, actorRole }) } catch {}
+    try { await this.emitGtrNotifications({ before: oldSnap as any, after: updated.toObject(), actorId, actorRole, autoConvertedBookingId }) } catch {}
     return updated
+  }
+
+  private async createBookingFromWonGroupTourRequest(doc: GroupTourRequestDocument, actorId: Types.ObjectId, actorRole: 'admin' | 'staff'): Promise<Types.ObjectId | null> {
+    const tourColl = this.model.db.collection('tours')
+    const placeholderTour = (await tourColl.findOne(
+      { type: 'group', isPublished: { $ne: false } },
+      { sort: { createdAt: -1 }, projection: { _id: 1, title: 1, slug: 1, code: 1, durationDays: 1, durationNights: 1, coverImageUrl: 1 } }
+    )) as any ?? (await tourColl.findOne(
+      { isPublished: { $ne: false } },
+      { sort: { createdAt: -1 }, projection: { _id: 1, title: 1, slug: 1, code: 1, durationDays: 1, durationNights: 1, coverImageUrl: 1 } }
+    )) as any
+    if (!placeholderTour) return null
+    const paxNL = Math.max(0, Number(doc.adultCount) || 0)
+    const paxTE = Math.max(0, Number(doc.childCount) || 0)
+    const paxEB = Math.max(0, Number(doc.infantCount) || 0)
+    const totalPax = paxNL + paxTE + paxEB
+    const passengers: BookingPassenger[] = []
+    for (let i = 0; i < paxNL; i += 1) passengers.push({ fullName: `[Đoàn ${doc.code}] Người lớn ${i + 1}`, type: 'NL', birthDate: null, gender: null, idCard: null, notes: null })
+    for (let i = 0; i < paxTE; i += 1) passengers.push({ fullName: `[Đoàn ${doc.code}] Trẻ em ${i + 1}`, type: 'TE', birthDate: null, gender: null, idCard: null, notes: null })
+    for (let i = 0; i < paxEB; i += 1) passengers.push({ fullName: `[Đoàn ${doc.code}] Em bé ${i + 1}`, type: 'EB', birthDate: null, gender: null, idCard: null, notes: null })
+    const snapshot: BookingTourSnapshot = {
+      title: String(placeholderTour.title || `Tour đoàn ${doc.destination || 'doanh nghiệp'}`),
+      slug: String(placeholderTour.slug || `group-tour-${doc.code.toLowerCase()}`),
+      code: String(placeholderTour.code || null),
+      durationDays: Number(placeholderTour.durationDays) || 0,
+      durationNights: Number(placeholderTour.durationNights) || 0,
+      coverImageUrl: placeholderTour.coverImageUrl || null,
+    }
+    const estimatePerPerson = Number(doc.budgetPerPersonVnd || 0) || Math.max(0, Math.floor(Number(doc.totalBudgetVnd || 0) / Math.max(1, totalPax)))
+    const totalAmount = Number(doc.totalBudgetVnd || 0) || (estimatePerPerson * totalPax) || 0
+    const departureDateRaw = doc.preferredStartDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const departureDate = new Date(departureDateRaw)
+    let code = `BK-GTR-${doc.code}`
+    const payload: Partial<Booking> = {
+      code,
+      tourId: placeholderTour._id instanceof Types.ObjectId ? placeholderTour._id : new Types.ObjectId(String(placeholderTour._id)),
+      tourSnapshot: snapshot,
+      departureId: new Types.ObjectId(),
+      departureDate,
+      departureStandardText: doc.hotelClassRequested ? `KH ${doc.hotelClassRequested}` : null,
+      adultCount: paxNL,
+      childCount: paxTE,
+      infantCount: paxEB,
+      priceAdultSnapshot: estimatePerPerson,
+      priceChildSnapshot: estimatePerPerson > 0 ? Math.floor(estimatePerPerson * 0.75) : 0,
+      priceInfantSnapshot: estimatePerPerson > 0 ? Math.floor(estimatePerPerson * 0.25) : 0,
+      contact: {
+        name: String(doc.contactName || '').trim(),
+        phone: String(doc.contactPhone || '').trim(),
+        email: doc.contactEmail ? String(doc.contactEmail).trim() : null,
+        address: null,
+      },
+      passengers,
+      notes: `Tự động tạo từ Tour đoàn WON ${doc.code} - ${doc.destination || ''}. ${doc.specialRequirements ? ('YC: ' + doc.specialRequirements) : ''}`,
+      surcharges: [],
+      subtotalAmount: totalAmount,
+      surchargeAmount: 0,
+      vatAmount: 0,
+      totalAmount,
+      currency: 'VND',
+      paymentMethod: 'hold',
+      paymentStatus: 'unpaid',
+      createdBy: actorRole === 'staff' || actorRole === 'admin' ? actorId : null,
+      status: 'new' as BookingStatus,
+      holdsUntil: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      isGroupTour: true,
+      groupCompanyName: doc.companyOrGroupName ? String(doc.companyOrGroupName).trim() : null,
+      groupContactPerson: doc.contactName ? String(doc.contactName).trim() : null,
+      groupContactRole: doc.contactRole ? String(doc.contactRole).trim() : null,
+      groupUploadedListFileUrl: null,
+      groupNote: `Chuyển đổi từ Tour đoàn Yêu cầu báo giá (WON): ${doc.code} - Ngày ưu tiên ${departureDate.toISOString().slice(0, 10)}. Ưu tiên: ${doc.priority}. ${doc.internalStaffNote ? ('Ghi chú nội bộ: ' + doc.internalStaffNote) : ''}`,
+      assignedStaffIds: doc.assignedStaffId ? [doc.assignedStaffId] : [],
+      updatedByStaffId: actorId,
+    } as any
+    const existsCode = await this.bookingModel.findOne({ code }).select('_id').lean().exec()
+    if (existsCode) {
+      let k = 2
+      while (await this.bookingModel.findOne({ code: `${code}-${k}` }).select('_id').lean().exec()) { k += 1; if (k > 99) break }
+      code = `${code}-${k}`
+      payload.code = code
+    }
+    const created = await this.bookingModel.create(payload)
+    const admins = await this.model.db.collection('users').find({ role: 'admin', isActive: { $ne: false } }).project({ _id: 1 }).toArray()
+    const notifBulk: CreateNotificationInput[] = []
+    const budgetTxt = totalAmount ? (Number(totalAmount).toLocaleString('vi-VN') + 'đ') : ''
+    for (const a of admins) {
+      notifBulk.push({
+        recipientId: new Types.ObjectId(String(a._id)),
+        recipientRole: 'admin',
+        type: 'admin_new_booking' as NotificationType,
+        title: `🔔 Đơn mới TỪ TOUR ĐOÀN WON: ${doc.code}`,
+        body: `${code} | ${doc.companyOrGroupName || ''} ${doc.destination || ''} · ${totalPax} khách${budgetTxt ? (' · ' + budgetTxt) : ''} · Cần tạo tour riêng và xử lý vé máy bay, khách sạn ngay.`,
+        entityType: 'booking',
+        entityId: created._id as any,
+        actionUrl: `/admin/bookings?id=${created._id}`,
+        priority: doc.priority === 'urgent' ? 'urgent' : 'high',
+        senderUserId: actorId,
+      })
+    }
+    if (doc.assignedStaffId) {
+      notifBulk.push({
+        recipientId: doc.assignedStaffId instanceof Types.ObjectId ? doc.assignedStaffId : new Types.ObjectId(String(doc.assignedStaffId)),
+        recipientRole: 'staff',
+        type: 'booking_assigned_staff' as NotificationType,
+        title: `Đơn booking mới (GTR Won) ${code}`,
+        body: `${doc.companyOrGroupName || ''} ${doc.destination || ''} · ${totalPax} khách. Bạn là nhân viên phụ trách, vui lòng tạo tour gói và xác nhận ngay.`,
+        entityType: 'booking',
+        entityId: created._id as any,
+        actionUrl: `/staff/bookings?id=${created._id}`,
+        priority: doc.priority === 'urgent' ? 'urgent' : 'high',
+        senderUserId: actorId,
+      })
+    }
+    if (doc.createdByUserId) {
+      notifBulk.push({
+        recipientId: doc.createdByUserId instanceof Types.ObjectId ? doc.createdByUserId : new Types.ObjectId(String(doc.createdByUserId)),
+        recipientRole: 'customer',
+        type: 'gtr_won_converted' as NotificationType,
+        title: `🎉 Chốt đơn thành công! ${doc.code}`,
+        body: `Yêu cầu tour đoàn ${doc.destination || ''} đã được chốt. Chúng tôi sẽ tạo booking ${code} và gửi chi tiết qua số ${doc.contactPhone || ''} trong 24 giờ. Cảm ơn quý khách đã tin dùng VietNam Explorer!`,
+        entityType: 'group_tour_request',
+        entityId: doc._id as any,
+        actionUrl: `/account/group-tour-requests?id=${doc._id}`,
+        priority: 'high',
+        senderUserId: actorId,
+      })
+    }
+    if (notifBulk.length) await this.notifications.bulk(notifBulk)
+    return created._id as Types.ObjectId
   }
 
   private async emitGtrNotifications(ctx: {
@@ -252,13 +431,14 @@ export class GroupTourRequestsService {
     after: GroupTourRequestDocument
     actorId: Types.ObjectId
     actorRole: 'admin' | 'staff'
+    autoConvertedBookingId?: Types.ObjectId | null
   }) {
-    const { before, after, actorId, actorRole } = ctx
+    const { before, after, actorId, actorRole, autoConvertedBookingId } = ctx
     const changedStatus = after.status !== before.status
     const code = String(after.code || before.code || after._id)
     const customerSummary = `${after.contactName || before.contactName || 'Khách đoàn'} - ${after.destination || before.destination || 'Tour đoàn'}`
     const pax = Number(after.adultCount || before.adultCount || 0) + Number(after.childCount || before.childCount || 0) + Number(after.infantCount || before.infantCount || 0)
-    const estimate = Number(after.totalBudgetVnd || before.totalBudgetVnd || (Number(after.budgetPerPersonVnd || before.budgetPerPersonVnd || 0) * Math.max(1, Number(after.adultCount || before.adultCount || 0) + Number(after.childCount || before.childCount || 0) + Number(after.infantCount || before.infantCount || 0))) || 0)
+    const estimate = Number(after.totalBudgetVnd || before.totalBudgetVnd || (Number(after.budgetPerPersonVnd || before.budgetPerPersonVnd || 0) * Math.max(1, Number(after.adultCount || before.adultCount || 0) + Number(after.childCount || before.childCount || 0) + Number(after.infantCount || before.infantCount || 0)))) || 0
     const list: CreateNotificationInput[] = []
 
     if (after.assignedStaffId && String(after.assignedStaffId) !== String(before.assignedStaffId)) {
@@ -334,7 +514,9 @@ export class GroupTourRequestsService {
           recipientRole: 'customer',
           type: 'gtr_won' as NotificationType,
           title: `Đã chốt đơn - ${code}`,
-          body: `Yêu cầu tour đoàn đã được xác nhận chính thức! Nhân viên sẽ gửi hợp đồng và biên lai đặt cọc trong 1 giờ.`,
+          body: autoConvertedBookingId
+            ? `Yêu cầu tour đoàn đã được xác nhận chính thức! Booking ID: ${after.convertedBookingId ? 'đã tạo đơn ' + String(after.convertedBookingId) : ''}. Nhân viên sẽ gửi hợp đồng và biên lai đặt cọc trong 1 giờ.`
+            : `Yêu cầu tour đoàn đã được xác nhận chính thức! Nhân viên sẽ gửi hợp đồng và biên lai đặt cọc trong 1 giờ.`,
           entityType: 'group_tour_request',
           entityId: after._id as any,
           actionUrl: after.convertedBookingId ? `/account/bookings?id=${after.convertedBookingId}` : `/account/notifications`,

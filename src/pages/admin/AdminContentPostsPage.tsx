@@ -296,7 +296,6 @@ export default function AdminContentPostsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Quản lý tin tức & bài viết: tạo mới, sửa, duyệt, xuất bản, import RSS."
         title="Tin tức"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">

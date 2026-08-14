@@ -244,7 +244,6 @@ export default function AdminContentReviewsPage() {
   return (
     <div className={cn('space-y-6', stale && 'opacity-80 blur-[0.4px] transition-opacity')} style={{ minHeight: initialLoading ? 1800 : undefined }}>
       <PageHeader
-        subtitle="Quản lý tất cả bài đánh giá khách hàng: ẩn, duyệt lại, điều phối staff xử lý tiêu cực, trả lời chính thức."
         title="Đánh giá Tour"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">

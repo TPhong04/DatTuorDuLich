@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <PageHeader subtitle="Nhập email để đặt lại mật khẩu." title="Quên mật khẩu" />
+      <PageHeader title="Quên mật khẩu" />
 
       <form
         className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"

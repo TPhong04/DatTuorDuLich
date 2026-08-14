@@ -9,12 +9,20 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e:install": "playwright install --with-deps chromium firefox webkit",
+    "e2e:dev": "playwright test --project=chromium --headed",
+    "e2e:ci": "CI=1 playwright test --reporter=list --project=chromium",
+    "e2e:all-browsers": "CI=1 playwright test"
   },
   "dependencies": {
+    "@sentry/react": "^10.70.0",
     "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "docx": "^9.7.1",
     "lucide-react": "^0.511.0",
     "react": "^18.3.1",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.3.0",
     "socket.io-client": "^4.8.3",
@@ -23,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
