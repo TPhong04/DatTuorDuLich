@@ -2,7 +2,6 @@ import { FormEvent, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 
 import { useToast } from '@/components/notifications/ToastProvider'
-import PageHeader from '@/components/ui/PageHeader'
 import { login } from '@/features/auth/auth'
 
 function defaultAfterLogin(role: 'customer' | 'staff' | 'admin') {
@@ -66,55 +65,95 @@ export default function LoginPage() {
   if (done && next) return <Navigate replace to={next} />
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      <PageHeader subtitle="Đăng nhập để đặt tour và quản lý booking." title="Đăng nhập" />
-      <form
-        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-        onSubmit={onSubmit}
-      >
-        {error ? (
-          <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-            {error}
-          </div>
-        ) : null}
-        <label className="block">
-          <div className="text-sm font-semibold text-slate-900">Email</div>
-          <input
-            className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            type="email"
-            value={email}
-          />
-        </label>
-        <label className="block">
-          <div className="text-sm font-semibold text-slate-900">Mật khẩu</div>
-          <input
-            className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            type="password"
-            value={password}
-          />
-        </label>
-        <button
-          className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
-          type="submit"
+    <div
+      className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-900 px-4 py-10"
+      style={{
+        backgroundImage: "url('/picture/bia_dulich.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* Lớp phủ tối để chữ dễ đọc trên ảnh nền */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/70 via-slate-900/50 to-slate-900/80" />
+
+      <div className="relative w-full max-w-md">
+        <div className="mb-8 text-center">
+          <Link className="inline-flex flex-col items-center gap-3" to="/">
+            <img
+              alt="VietNam Explore"
+              className="h-28 w-28 rounded-full border-4 border-white/90 object-cover shadow-xl shadow-black/30"
+              src="/picture/logo4.png"
+            />
+            <span className="text-2xl font-extrabold tracking-tight">
+              <span className="text-blue-900">VietNam</span> <span className="text-sky-400">Explore</span>
+            </span>
+            <span className="text-xs font-medium italic text-blue-900/90">Mỗi hành trình là một trải nghiệm</span>
+          </Link>
+          <p className="mt-4 text-sm text-white/80">Đăng nhập để đặt tour và quản lý booking.</p>
+        </div>
+
+        <form
+          className="space-y-4 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-2xl shadow-black/40 backdrop-blur-sm"
+          onSubmit={onSubmit}
         >
-          Đăng nhập
-        </button>
-        <div className="text-center text-sm">
-          <Link className="font-semibold text-blue-800 hover:underline" to={`/auth/forgot-password?email=${encodeURIComponent(email)}`}>
-            Quên mật khẩu?
+          <div>
+            <h1 className="flex items-center gap-2 text-xl font-extrabold text-slate-900">
+              <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-orange-500 to-blue-800" />
+              Đăng nhập
+            </h1>
+          </div>
+
+          {error ? (
+            <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+              {error}
+            </div>
+          ) : null}
+
+          <label className="block">
+            <div className="text-sm font-semibold text-slate-900">Email</div>
+            <input
+              className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              type="email"
+              value={email}
+            />
+          </label>
+          <label className="block">
+            <div className="text-sm font-semibold text-slate-900">Mật khẩu</div>
+            <input
+              className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              type="password"
+              value={password}
+            />
+          </label>
+          <button
+            className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-orange-500 text-sm font-semibold text-white transition hover:bg-orange-600"
+            type="submit"
+          >
+            Đăng nhập
+          </button>
+          <div className="text-center text-sm">
+            <Link className="font-semibold text-blue-800 hover:underline" to={`/auth/forgot-password?email=${encodeURIComponent(email)}`}>
+              Quên mật khẩu?
+            </Link>
+          </div>
+          <div className="text-center text-sm text-slate-600">
+            Chưa có tài khoản?{' '}
+            <Link className="font-semibold text-blue-800 hover:underline" to="/auth/register">
+              Đăng ký
+            </Link>
+          </div>
+        </form>
+
+        <div className="mt-6 text-center">
+          <Link className="text-sm font-medium text-white/80 hover:text-white hover:underline" to="/">
+            ← Về trang chủ
           </Link>
         </div>
-        <div className="text-center text-sm text-slate-600">
-          Chưa có tài khoản?{' '}
-          <Link className="font-semibold text-blue-800 hover:underline" to="/auth/register">
-            Đăng ký
-          </Link>
-        </div>
-      </form>
+      </div>
     </div>
   )
 }

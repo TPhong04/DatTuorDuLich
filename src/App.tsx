@@ -94,10 +94,6 @@ export default function App() {
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/policy/cancel" element={<CancelPolicyPage />} />
 
-            <Route path="/auth/login" element={<LoginPage />} />
-            <Route path="/auth/register" element={<RegisterPage />} />
-            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-
             <Route path="/dat-tour/:slug" element={<BookingPublicRoute />} />
 
             <Route element={<RequireAuth />}>
@@ -110,6 +106,11 @@ export default function App() {
 
             <Route path="*" element={<NotFoundPage />} />
           </Route>
+
+          {/* Auth routes: trang riêng, không dùng AppShell (không header/footer) */}
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/register" element={<RegisterPage />} />
+          <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
 
           <Route element={<RequireRole role="staff" />}>
             <Route element={<StaffShell />} path="/staff">
