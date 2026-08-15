@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PageHeader from '@/components/ui/PageHeader'
+import { DateRangeInput } from '@/components/ui/DateRangeInput'
 import { useToast } from '@/components/notifications/ToastProvider'
 import { getStoredUser } from '@/features/auth/auth'
 import {
@@ -109,8 +110,7 @@ export default function GroupTourRequestPage() {
   return (
     <form onSubmit={submit} className="space-y-6">
       <PageHeader
-        subtitle="Điền thông tin dưới đây, chuyên viên Tour đoàn sẽ gọi điện tư vấn + báo giá 3 phương án chi tiết trong 30 phút."
-        title="📋 Gửi yêu cầu báo giá Tour đoàn"
+        title="📩 Gửi yêu cầu đặt Tour đoàn"
         right={
           <Link to="/group-tour" className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-extrabold text-slate-700 hover:bg-slate-50">
             ← Giới thiệu Tour đoàn
@@ -160,13 +160,19 @@ export default function GroupTourRequestPage() {
                 <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Điểm đến / Tour mong muốn *</label>
                 <input value={form.destination} onChange={(e) => set('destination', e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="Hạ Long 2N1Đ / Miền Tây 3N2Đ / Lào Cai Sapa..." />
               </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Ngày đi dự kiến</label>
-                <input type="date" value={form.preferredStartDate} onChange={(e) => set('preferredStartDate', e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Ngày về dự kiến</label>
-                <input type="date" value={form.preferredEndDate} onChange={(e) => set('preferredEndDate', e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Thời gian khởi hành dự kiến</label>
+                <div className="mt-1">
+                  <DateRangeInput
+                    size="lg"
+                    variant="customer"
+                    from={form.preferredStartDate || null}
+                    to={form.preferredEndDate || null}
+                    onChange={(next) => { set('preferredStartDate', next.from || ''); set('preferredEndDate', next.to || '') }}
+                    placeholder="Ngày đi"
+                    placeholderTo="Ngày về"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Thời gian tour</label>

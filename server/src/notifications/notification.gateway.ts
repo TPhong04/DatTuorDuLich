@@ -12,6 +12,7 @@ import {
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { Types } from 'mongoose'
+import { corsOriginCallback, parseCorsOrigins } from '../security/cors.helpers'
 import { JwtPayload } from '../auth/auth.types'
 import { NotificationDocument } from './notification.schema'
 
@@ -21,7 +22,7 @@ interface WsSocketData {
 
 @WebSocketGateway({
   cors: {
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => callback(null, true),
+    origin: corsOriginCallback(parseCorsOrigins(process.env.CORS_ORIGINS)),
     credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
   },

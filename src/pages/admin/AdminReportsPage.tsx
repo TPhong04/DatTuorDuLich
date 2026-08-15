@@ -32,6 +32,8 @@ import {
 } from 'lucide-react'
 
 import PageHeader from '@/components/ui/PageHeader'
+import { DateInput } from '@/components/ui/DateInput'
+import { DateRangeInput } from '@/components/ui/DateRangeInput'
 import { DonutChart, RevenueLineChart } from '@/components/dashboard/DashboardCharts'
 import { KpiCard } from '@/components/dashboard/DashboardWidgets'
 import {
@@ -700,7 +702,6 @@ export default function AdminReportsPage() {
     <div className="space-y-6 2xl:space-y-7 [&>*]:animate-[fadeSlideIn_0.35s_ease-out]">
       <PageHeader
         title="Báo cáo"
-        subtitle="7 tabs theo module CRM VietNamExplorer: Tài chính, Bookings, Tours, KH, Lịch KH, NV, Marketing."
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">
             {activeTab === 'financial' ? dataStateBadge : null}
@@ -814,26 +815,19 @@ export default function AdminReportsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Từ ngày</label>
-                <input
-                  type="date"
-                  value={fromISO}
-                  onChange={(e) => {
-                    setFromISO(e.target.value)
-                    if (preset !== 'custom') setPreset('custom')
-                  }}
-                  className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none"
-                />
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">→ Đến</label>
-                <input
-                  type="date"
-                  value={toISO}
-                  onChange={(e) => {
-                    setToISO(e.target.value)
-                    if (preset !== 'custom') setPreset('custom')
-                  }}
-                  className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none"
-                />
+                <div className="w-[320px] max-w-full">
+                  <DateRangeInput
+                    size="sm"
+                    variant="admin"
+                    from={fromISO || null}
+                    to={toISO || null}
+                    onChange={(next) => {
+                      setFromISO(next.from || '')
+                      setToISO(next.to || '')
+                      if ((next.from || next.to) && preset !== 'custom') setPreset('custom')
+                    }}
+                  />
+                </div>
                 <select
                   value={tourType}
                   onChange={(e) => setTourType(e.target.value)}
@@ -1641,10 +1635,14 @@ function AdminBookingsReportTab(p: BookingsTabProps) {
             })}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Từ</label>
-            <input type="date" value={p.fromISO} onChange={(e) => p.setFromISO(e.target.value)} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none" />
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">→ Đến</label>
-            <input type="date" value={p.toISO} onChange={(e) => p.setToISO(e.target.value)} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none" />
+            <DateRangeInput
+              size="sm"
+              variant="admin"
+              className="w-[280px]"
+              from={p.fromISO || null}
+              to={p.toISO || null}
+              onChange={(next) => { p.setFromISO(next.from || ''); p.setToISO(next.to || '') }}
+            />
             <select value={p.tourCategory} onChange={(e) => p.setTourCategory(e.target.value)} className="rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none">
               {TOUR_CATEGORY_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
@@ -1705,12 +1703,14 @@ function AdminBookingsReportTab(p: BookingsTabProps) {
                 </div>
               </FilterBox>
               <FilterBox label="Ngày khởi hành">
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs font-bold text-slate-500">Từ</label>
-                  <input type="date" value={p.departureFrom} onChange={(e) => p.setDepartureFrom(e.target.value)} className="rounded-2xl bg-white px-3 py-2 text-sm font-medium ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none" />
-                  <label className="text-xs font-bold text-slate-500">→ Đến</label>
-                  <input type="date" value={p.departureTo} onChange={(e) => p.setDepartureTo(e.target.value)} className="rounded-2xl bg-white px-3 py-2 text-sm font-medium ring-1 ring-slate-200 focus:ring-blue-500 focus:outline-none" />
-                </div>
+                <DateRangeInput
+                  size="sm"
+                  variant="admin"
+                  className="w-[280px]"
+                  from={p.departureFrom || null}
+                  to={p.departureTo || null}
+                  onChange={(next) => { p.setDepartureFrom(next.from || ''); p.setDepartureTo(next.to || '') }}
+                />
               </FilterBox>
               <FilterBox label="Giá trị đơn (VND)">
                 <div className="flex flex-wrap items-center gap-2">

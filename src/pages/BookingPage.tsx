@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { useToast } from '@/components/notifications/ToastProvider'
+import { DateInput } from '@/components/ui/DateInput'
 import { BookingWizardProvider, useBookingWizard } from '@/features/bookings/BookingWizardContext'
 import { BookingPassenger, BookingSurchargeLine, createPublicBooking } from '@/features/bookings/bookings'
 import { getPublicTour } from '@/features/tours/tours'
@@ -25,6 +26,52 @@ function toLocalDate(v: string | Date | null | undefined) {
 function formatMoney(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '-'
   return `${n.toLocaleString('vi-VN')}đ`
+}
+
+const VIETNAM_PHONE_REGEX_FE = /^(?:\+84|84|0)(?:3[2-9]|5[2689]|7[06-9]|8[1-9]|9[0-9]|2[0-9]{2})\d{6,7}$/
+function isValidVnPhone(raw: string): boolean {
+  const cleaned = String(raw || '').replace(/[^\d+]/g, '').replace(/^00/, '+')
+  if (!cleaned) return false
+  if (VIETNAM_PHONE_REGEX_FE.test(cleaned)) return true
+  const digitsOnly = cleaned.replace(/\D+/g, '')
+  return digitsOnly.length >= 9 && digitsOnly.length <= 11 && /^[0-9]+$/.test(digitsOnly)
+}
+
+function StickyMobileCtaBar({ step, tour, dep, onNextStep, onPrevStep }: { step: 1 | 2 | 3 | 4; tour: PublicTourDetail | null; dep: PublicTourDeparture | null; onNextStep: () => void; onPrevStep: () => void }) {
+  const { totalPax, draft } = useBookingWizard()
+  const subtotal = useMemo(() => {
+    if (!dep) return 0
+    const a = (draft.pax.adult || 0) * (dep.priceAdult || 0)
+    const c = (draft.pax.child || 0) * (typeof dep.priceChild === 'number' ? dep.priceChild : 0)
+    const i = (draft.pax.infant || 0) * (typeof dep.priceInfant === 'number' ? dep.priceInfant : 0)
+    return a + c + i
+  }, [draft.pax.adult, draft.pax.child, draft.pax.infant, dep])
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden">
+      <div className="mx-auto flex h-16 w-full max-w-[640px] items-center gap-2 px-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{tour?.code || ''} · {totalPax} khách</div>
+          <div className="text-lg font-black text-orange-600 leading-none">{formatMoney(subtotal)}</div>
+          <div className="truncate text-[11px] text-slate-500">{dep ? formatDate(dep.departureDate) : 'Chưa chọn đợt'}</div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {step === 2 || step === 3 ? (
+            <button type="button" onClick={onPrevStep} className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-extrabold uppercase text-slate-700 hover:bg-slate-50">←</button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onNextStep}
+            className={
+              'inline-flex h-12 items-center justify-center rounded-2xl px-5 text-[12px] font-black uppercase text-white shadow-sm ' +
+              (step === 3 ? 'bg-emerald-700 hover:bg-emerald-800 shadow-emerald-800/20' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20')
+            }
+          >
+            {step === 3 ? 'Đặt tour' : 'Tiếp tục'} →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function WizardSteps({ step }: { step: 1 | 2 | 3 | 4 }) {
@@ -65,7 +112,8 @@ function WizardSteps({ step }: { step: 1 | 2 | 3 | 4 }) {
   )
 }
 
-function PaxStepper({ label, value, onChange, max = 20 }: { label: string; value: number; onChange: (n: number) => void; max?: number }) {
+function PaxStepper({ label, value, onChange, max = 20, disabledPlus }: { label: string; value: number; onChange: (n: number) => void; max?: number; disabledPlus?: boolean }) {
+  const plusDisabled = disabledPlus || value >= max
   return (
     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3">
       <div>
@@ -77,7 +125,7 @@ function PaxStepper({ label, value, onChange, max = 20 }: { label: string; value
           −
         </button>
         <span className="w-6 text-center text-lg font-extrabold text-slate-900">{value}</span>
-        <button type="button" onClick={() => onChange(Math.min(max, value + 1))} className="flex h-9 w-9 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-lg font-bold text-orange-700 hover:bg-orange-100">
+        <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={plusDisabled} className={'flex h-9 w-9 items-center justify-center rounded-xl border text-lg font-bold ' + (plusDisabled ? ' border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed' : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100')}>
           +
         </button>
       </div>
@@ -158,7 +206,7 @@ function SidebarSummary({ tour, dep }: { tour: PublicTourDetail | null; dep: Pub
 }
 
 function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDetail | null; toast: ReturnType<typeof useToast> }) {
-  const { draft, setDepartureId, setPax, setTourSlug } = useBookingWizard()
+  const { draft, setDepartureId, setPax, setSeatsAvailableLimit, setTourSlug, totalPax, remainingPaxCap } = useBookingWizard()
   useEffect(() => {
     if (tour?.slug && draft.tourSlug !== tour.slug) setTourSlug(tour.slug)
   }, [tour?.slug, draft.tourSlug])
@@ -171,6 +219,11 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
     }
     return list.find((d) => d.status === 'open') ?? list[0] ?? null
   }, [tour, draft.departureId])
+  useEffect(() => {
+    setSeatsAvailableLimit(selectedDep?.status === 'open' ? (selectedDep.seatsAvailable ?? null) : 0)
+  }, [selectedDep?.id, selectedDep?.status, selectedDep?.seatsAvailable])
+  const retailMax = 20
+  const overLimit = (selectedDep?.seatsAvailable ?? 0) < totalPax
   return (
     <div className="space-y-5">
       <SectionCard title="1. Chọn đợt khởi hành" desc="Chọn ngày khởi hành phù hợp lịch trình và ngân sách của bạn.">
@@ -208,20 +261,30 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
       </SectionCard>
       <SectionCard title="2. Chọn số lượng hành khách" desc="Người lớn (≥ 11 tuổi) · Trẻ em (2–10) · Em bé (< 2 tuổi).">
         <div className="grid gap-3 md:grid-cols-3">
-          <PaxStepper label="👤 Người lớn (NL)" value={draft.pax.adult} onChange={(n) => setPax({ adult: n })} />
-          <PaxStepper label="🧒 Trẻ em (TE)" value={draft.pax.child} onChange={(n) => setPax({ child: n })} />
-          <PaxStepper label="👶 Em bé (EB)" value={draft.pax.infant} onChange={(n) => setPax({ infant: n })} />
+          <PaxStepper label="👤 Người lớn (NL)" value={draft.pax.adult} onChange={(n) => setPax({ adult: n })} max={Math.max(0, draft.pax.adult + remainingPaxCap)} disabledPlus={remainingPaxCap <= 0 || draft.pax.adult >= retailMax} />
+          <PaxStepper label="🧒 Trẻ em (TE)" value={draft.pax.child} onChange={(n) => setPax({ child: n })} max={Math.max(0, draft.pax.child + remainingPaxCap)} disabledPlus={remainingPaxCap <= 0 || draft.pax.child >= retailMax} />
+          <PaxStepper label="👶 Em bé (EB)" value={draft.pax.infant} onChange={(n) => setPax({ infant: n })} max={Math.max(0, draft.pax.infant + remainingPaxCap)} disabledPlus={remainingPaxCap <= 0 || draft.pax.infant >= retailMax} />
         </div>
+        {selectedDep ? (
+          <div className={'mt-3 rounded-2xl border px-3 py-2 text-xs font-semibold ' + (overLimit ? 'border-rose-200 bg-rose-50 text-rose-700' : (totalPax > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'))}>
+            {overLimit
+              ? `⚠️ Vượt quá giới hạn: ${totalPax} khách đã chọn > ${selectedDep.seatsAvailable} chỗ còn trống. Vui lòng giảm số lượng hành khách hoặc chọn đợt khởi hành khác.`
+              : totalPax > 0
+                ? `✅ ${totalPax} hành khách đã chọn · Còn ${Math.max(0, (selectedDep.seatsAvailable ?? 0) - totalPax)} chỗ trống · 1 giao dịch tối đa ${retailMax} khách (đoàn lớn liên hệ Tour đoàn).`
+                : `Đợt này còn ${selectedDep.seatsAvailable ?? 0} chỗ trống.`
+            }
+          </div>
+        ) : null}
       </SectionCard>
       <div className="flex justify-end">
         <button
           type="button"
           onClick={() => {
             if (!selectedDep) return toast.error('Vui lòng chọn đợt khởi hành trước khi tiếp tục.')
-            const total = draft.pax.adult + draft.pax.child + draft.pax.infant
-            if (total <= 0) return toast.error('Vui lòng chọn ít nhất 1 hành khách.')
-            if (total > 20) return toast.error('1 lần đặt tối đa 20 hành khách, đoàn lớn vui lòng liên hệ.')
-            if (selectedDep.seatsAvailable < total) return toast.error(`Chỉ còn ${selectedDep.seatsAvailable} chỗ, vui lòng giảm số lượng hành khách.`)
+            if (selectedDep.status !== 'open') return toast.error('Đợt khởi hành này đã đóng bán, vui lòng chọn đợt khác.')
+            if (totalPax <= 0) return toast.error('Vui lòng chọn ít nhất 1 hành khách.')
+            if (totalPax > retailMax) return toast.error(`1 lần đặt tối đa ${retailMax} hành khách, đoàn lớn vui lòng liên hệ Tour đoàn.`)
+            if ((selectedDep.seatsAvailable ?? 0) < totalPax) return toast.error(`Chỉ còn ${selectedDep.seatsAvailable} chỗ, vui lòng giảm số lượng hành khách.`)
             onNext()
           }}
           className="inline-flex h-12 items-center justify-center rounded-2xl bg-orange-500 px-8 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
@@ -233,7 +296,7 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
   )
 }
 
-function PassengerCard({ idx, passenger, onChange, onRemove, canRemove }: { idx: number; passenger: BookingPassenger; onChange: (p: BookingPassenger) => void; onRemove?: () => void; canRemove?: boolean }) {
+function PassengerCard({ idx, passenger, onChange, onRemove, canRemove, departureDate }: { idx: number; passenger: BookingPassenger; onChange: (p: BookingPassenger) => void; onRemove?: () => void; canRemove?: boolean; departureDate?: Date | string | null }) {
   const [dateVal, setDateVal] = useState<string>(() => toInputDate(passenger.birthDate))
   useEffect(() => {
     const expected = toInputDate(passenger.birthDate)
@@ -255,31 +318,60 @@ function PassengerCard({ idx, passenger, onChange, onRemove, canRemove }: { idx:
     }
     return false
   }
+  const ageAtDeparture = ((): number | null => {
+    if (!passenger.birthDate) return null
+    const b = new Date(String(passenger.birthDate).slice(0, 10) + 'T00:00:00Z')
+    if (Number.isNaN(b.getTime())) return null
+    let at: Date | null = null
+    if (departureDate instanceof Date) at = departureDate
+    else if (typeof departureDate === 'string' && departureDate.length >= 10) at = new Date(departureDate.slice(0, 10) + 'T00:00:00Z')
+    if (!at || Number.isNaN(at.getTime())) return null
+    let years = at.getUTCFullYear() - b.getUTCFullYear()
+    const m = at.getUTCMonth() - b.getUTCMonth()
+    if (m < 0 || (m === 0 && at.getUTCDate() < b.getUTCDate())) years -= 1
+    return years
+  })()
+  const ageMismatch = ((): string | null => {
+    if (ageAtDeparture === null) return null
+    const t = passenger.type
+    if (ageAtDeparture < 2 && t !== 'EB') return `Hành khách ${ageAtDeparture} tuổi (tại ngày khởi hành) nên chọn loại EB (em bé < 2 tuổi).`
+    if (ageAtDeparture >= 2 && ageAtDeparture <= 12 && t !== 'TE') return `Hành khách ${ageAtDeparture} tuổi (tại ngày khởi hành) nên chọn loại TE (trẻ em 2-12 tuổi).`
+    if (ageAtDeparture >= 13 && t !== 'NL') return `Hành khách ${ageAtDeparture} tuổi (tại ngày khởi hành) nên chọn loại NL (người lớn ≥ 13 tuổi).`
+    return null
+  })()
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className={'rounded-2xl border bg-white p-4 ' + (ageMismatch ? 'border-rose-300 ring-4 ring-rose-50/70' : 'border-slate-200')}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-extrabold text-white">#{idx + 1}</span>
-          <span className="text-sm font-extrabold text-slate-900">Hành khách</span>
-          <span
-            className={
-              'inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ' +
-              (passenger.type === 'NL'
-                ? 'bg-blue-50 text-blue-700'
-                : passenger.type === 'TE'
-                ? 'bg-violet-50 text-violet-700'
-                : 'bg-pink-50 text-pink-700')
-            }
-          >
-            {passenger.type}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-extrabold text-white">#{idx + 1}</span>
+            <span className="text-sm font-extrabold text-slate-900">Hành khách</span>
+            <span
+              className={
+                'inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ' +
+                (passenger.type === 'NL'
+                  ? 'bg-blue-50 text-blue-700'
+                  : passenger.type === 'TE'
+                  ? 'bg-violet-50 text-violet-700'
+                  : 'bg-pink-50 text-pink-700')
+              }
+            >
+              {passenger.type}
+            </span>
+            {ageAtDeparture !== null ? (
+              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">{ageAtDeparture} tuổi @ khởi hành</span>
+            ) : null}
+          </div>
+          {canRemove ? (
+            <button type="button" onClick={onRemove} className="text-xs font-bold text-rose-500 hover:text-rose-700">
+              Xoá
+            </button>
+          ) : null}
         </div>
-        {canRemove ? (
-          <button type="button" onClick={onRemove} className="text-xs font-bold text-rose-500 hover:text-rose-700">
-            Xoá
-          </button>
+        {ageMismatch ? (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 px-3 py-2 text-[11px] font-semibold leading-snug text-rose-700">
+            ⚠️ {ageMismatch}
+          </div>
         ) : null}
-      </div>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div className="md:col-span-1">
           <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Loại hành khách</label>
@@ -295,23 +387,26 @@ function PassengerCard({ idx, passenger, onChange, onRemove, canRemove }: { idx:
         </div>
         <div>
           <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Ngày sinh</label>
-          <input
-            type="date"
-            value={dateVal}
-            onChange={(e) => {
-              const v = e.target.value
-              setDateVal(v)
-              if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-                const iso = toISODateOnly(v)
-                if ((passenger.birthDate || '').slice(0, 10) !== (iso || '').slice(0, 10)) {
-                  onChange({ ...passenger, birthDate: iso })
+          <div className="mt-1">
+            <DateInput
+              size="lg"
+              variant="customer"
+              value={dateVal || null}
+              disabledFuture
+              onChange={(iso) => {
+                setDateVal(iso || '')
+                if (iso) {
+                  const isoOnly = toISODateOnly(iso)
+                  if ((passenger.birthDate || '').slice(0, 10) !== (isoOnly || '').slice(0, 10)) {
+                    onChange({ ...passenger, birthDate: isoOnly })
+                  }
+                } else {
+                  if (passenger.birthDate) onChange({ ...passenger, birthDate: null })
                 }
-              }
-            }}
-            onBlur={() => commitBirthDateIfReady(true)}
-            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-            className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4"
-          />
+              }}
+              placeholder="Chọn ngày sinh"
+            />
+          </div>
         </div>
         <div>
           <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Giới tính</label>
@@ -337,7 +432,7 @@ function PassengerCard({ idx, passenger, onChange, onRemove, canRemove }: { idx:
   )
 }
 
-function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => void; toast: ReturnType<typeof useToast> }) {
+function Step2({ onNext, onPrev, toast, dep }: { onNext: () => void; onPrev: () => void; toast: ReturnType<typeof useToast>; dep: PublicTourDeparture | null }) {
   const { draft, totalPax, setGroup } = useBookingWizard()
   const auth = useAuth()
   const isGroup = Boolean(draft.group?.isGroupTour)
@@ -431,7 +526,22 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
           </div>
           <div>
             <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Số điện thoại *</label>
-            <input value={contact.phone} onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" placeholder="09xx xxx xxx" />
+            <input
+              value={contact.phone}
+              onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+              className={
+                'mt-1 h-11 w-full rounded-xl border bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4 ' +
+                (contact.phone.trim() && !isValidVnPhone(contact.phone)
+                  ? 'border-rose-400 ring-4 ring-rose-100 focus:border-rose-500'
+                  : 'border-slate-200')
+              }
+              placeholder="09xx xxx xxx"
+            />
+            {contact.phone.trim() && !isValidVnPhone(contact.phone) ? (
+              <div className="mt-1.5 rounded-lg border border-rose-200 bg-rose-50/80 px-2.5 py-1 text-[11px] font-semibold text-rose-700 leading-snug">
+                ⚠️ SĐT hợp lệ VN: 09xx/03xx/08xx/07xx/05xx (9-10 số) / 02xx (cố vấn 10-11 số) / +84 9xx. Hiện định dạng này không đúng.
+              </div>
+            ) : null}
           </div>
           <div>
             <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">Email</label>
@@ -484,6 +594,7 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
                 key={i}
                 idx={i}
                 passenger={p}
+                departureDate={dep?.departureDate || null}
                 onChange={(np) => setPassengers((list) => list.map((pp, ii) => (ii === i ? np : pp)))}
               />
             ))}
@@ -501,7 +612,7 @@ function Step2({ onNext, onPrev, toast }: { onNext: () => void; onPrev: () => vo
           type="button"
           onClick={() => {
             if (!contact.name.trim()) return toast.error('Vui lòng nhập Họ tên người đặt.')
-            if (!contact.phone.trim() || contact.phone.replace(/\D/g, '').length < 8) return toast.error('Vui lòng nhập số điện thoại hợp lệ.')
+            if (!contact.phone.trim() || contact.phone.replace(/\D/g, '').length < 8 || !isValidVnPhone(contact.phone)) return toast.error('Số điện thoại không đúng định dạng Việt Nam (09/03/08/07/05/02xx).')
             const emailRaw = (contact.email || '').trim()
             if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
               return toast.error('Email không hợp lệ, vui lòng nhập lại hoặc để trống.')
@@ -569,6 +680,15 @@ function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; on
   }, [draft.pax.adult, draft.pax.child, draft.pax.infant, dep])
   const surchTotal = surcharges.reduce((s, l) => s + Math.max(0, l.quantity || 0) * Math.max(0, l.unitPrice || 0), 0)
   const grand = paxPrices.subtotal + surchTotal
+  const submit = useCallback(() => {
+    if (!agree) return toast.error('Vui lòng đồng ý điều khoản & chính sách hủy trước khi đặt.')
+    onConfirm({ method, surcharges, agree })
+  }, [agree, method, surcharges, onConfirm, toast])
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); submit() }
+    document.addEventListener('booking-cta-step3-submit', handler as EventListener)
+    return () => { document.removeEventListener('booking-cta-step3-submit', handler as EventListener) }
+  }, [submit])
   return (
     <div className="space-y-5">
       <SectionCard title="Dịch vụ bổ sung (phụ thu)" desc="Chọn thêm phụ thu nếu có nhu cầu đặt phòng riêng / bảo hiểm / đón trả sân bay.">
@@ -700,10 +820,7 @@ function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; on
         <button type="button" onClick={onPrev} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-8 text-xs font-extrabold uppercase text-slate-700 hover:bg-slate-50">← Quay lại</button>
         <button
           type="button"
-          onClick={() => {
-            if (!agree) return toast.error('Vui lòng đồng ý điều khoản & chính sách hủy trước khi đặt.')
-            onConfirm({ method, surcharges, agree })
-          }}
+          onClick={submit}
           className="inline-flex h-13 items-center justify-center rounded-2xl bg-emerald-700 px-8 py-3 text-xs font-extrabold uppercase text-white shadow-md shadow-emerald-800/30 hover:bg-emerald-800 disabled:opacity-60"
         >
           ✅ Xác nhận đặt tour
@@ -787,7 +904,7 @@ export default function BookingPage() {
   return (
     <div>
       <WizardSteps step={step} />
-      <div className="mx-auto grid w-full max-w-[1640px] gap-6 px-4 py-8 2xl:px-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className={'mx-auto grid w-full max-w-[1640px] gap-6 px-4 2xl:px-6 lg:grid-cols-[minmax(0,1fr)_420px] ' + (step !== 4 ? 'pb-24 md:pb-8 py-8' : 'py-8')}>
         <div className="min-w-0">
           <div className="mb-5">
             <h1 className="text-2xl font-black text-slate-900">
@@ -796,7 +913,7 @@ export default function BookingPage() {
             <p className="mt-1 text-sm text-slate-500">4 bước nhanh chóng. Xác nhận đơn sẽ được gửi qua SMS / email trong 30 phút.</p>
           </div>
           {step === 1 ? <Step1 toast={toast} tour={tour} onNext={() => setStep(2)} /> : null}
-          {step === 2 ? <Step2 toast={toast} onPrev={() => setStep(1)} onNext={() => setStep(3)} /> : null}
+          {step === 2 ? <Step2 toast={toast} dep={selectedDep} onPrev={() => setStep(1)} onNext={() => setStep(3)} /> : null}
           {step === 3 ? (
             <Step3
               toast={toast}
@@ -867,6 +984,11 @@ export default function BookingPage() {
           </div>
         </div>
       ) : null}
+      {step !== 4 ? <StickyMobileCtaBar step={step} tour={tour} dep={selectedDep} onNextStep={() => {
+        if (step === 1) setStep(2)
+        else if (step === 2) setStep(3)
+        else if (step === 3) document.dispatchEvent(new CustomEvent('booking-cta-step3-submit'))
+      }} onPrevStep={() => { if (step === 2) setStep(1); else if (step === 3) setStep(2) }} /> : null}
     </div>
   )
 }

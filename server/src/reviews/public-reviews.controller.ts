@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Ip, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Ip, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { ZodError } from 'zod'
 
 import { JwtPayload } from '../auth/auth.types'
@@ -9,6 +9,7 @@ import {
   createReviewDto,
   reportReviewDto,
   myPendingReviewBookingsQueryDto,
+  updateReviewDto,
 } from './dto'
 import { ReviewsService } from './reviews.service'
 
@@ -23,7 +24,7 @@ export class PublicReviewsController {
       if (err instanceof ZodError) {
         const first = err.errors[0]
         const msg = first ? `${first.path.join('.')}: ${first.message}` : 'Dữ liệu không hợp lệ'
-        throw new (require('@nestjs/common').BadRequestException)(msg)
+        throw new BadRequestException(msg)
       }
       throw err
     }
@@ -70,8 +71,7 @@ export class PublicReviewsController {
   @Patch(':id')
   @UseGuards(AccessTokenGuard)
   async update(@CurrentUser() actor: JwtPayload, @Param('id') id: string, @Body() body: unknown) {
-    const UpdateReviewSchema = (require('./dto') as typeof import('./dto')).updateReviewDto
-    const dto = this.parse(UpdateReviewSchema, body)
+    const dto = this.parse(updateReviewDto, body)
     return this.reviews.update(id, dto as any, actor)
   }
 

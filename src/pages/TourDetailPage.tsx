@@ -37,9 +37,14 @@ function parseYoutubeEmbed(url: string | null | undefined): string | null {
   return null
 }
 
-function statusBadge(s: string) {
+function statusBadge(s: string, seatsAvailable?: number | null) {
+  const seatsNum = typeof seatsAvailable === 'number' ? seatsAvailable : null
+  if (seatsNum !== null && seatsNum <= 0 && s !== 'closed' && s !== 'cancelled' && s !== 'soldout') {
+    return { label: 'Hết chỗ', cls: 'bg-slate-200 text-slate-600 ring-slate-300' }
+  }
   switch (s) {
     case 'open':
+    case 'available':
       return { label: 'Mở bán', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
     case 'closed':
       return { label: 'Đóng bán', cls: 'bg-slate-100 text-slate-600 ring-slate-200' }
@@ -175,8 +180,7 @@ export default function TourDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Trang chi tiết tour: lịch trình, lịch khởi hành, số chỗ còn, chính sách hủy."
-        title={tour?.title || `Chi tiết tour: ${slug ?? ''}`}
+        title={tour?.title || 'Chi tiết tour'}
         right={
           bookingBasePath && selectedBookingDep?.id ? (
             <Link
@@ -207,14 +211,52 @@ export default function TourDetailPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div className="aspect-[16/9] bg-slate-100">
-              {gallery[0] ? <img alt={tour?.title || 'Tour'} className="h-full w-full object-cover" src={gallery[0]} /> : <div className="h-full w-full" />}
+            <div className="aspect-[16/10] w-full overflow-hidden bg-slate-100 ring-1 ring-inset ring-slate-200/70">
+              {gallery[0] ? (
+                <div className="relative h-full w-full">
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute inset-0 h-full w-full',
+                      'scale-110 blur-2xl opacity-40 saturate-150',
+                      'object-cover',
+                    )}
+                    src={gallery[0]}
+                  />
+                  <img
+                    alt={tour?.title || 'Tour'}
+                    className={cn(
+                      'relative z-10 h-full w-full',
+                      'object-contain',
+                    )}
+                    src={gallery[0]}
+                  />
+                </div>
+              ) : <div className="h-full w-full" />}
             </div>
             {gallery.length > 1 ? (
               <div className="grid gap-2 p-4 md:grid-cols-3">
                 {gallery.slice(1, 4).map((u) => (
-                  <div key={u} className="aspect-[16/10] overflow-hidden rounded-2xl bg-slate-100">
-                    <img alt="Gallery" className="h-full w-full object-cover" src={u} />
+                  <div key={u} className="aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-inset ring-slate-200/70">
+                    <div className="relative h-full w-full">
+                      <img
+                        alt=""
+                        aria-hidden="true"
+                        className={cn(
+                          'absolute inset-0 h-full w-full',
+                          'scale-110 blur-xl opacity-40 saturate-150 object-cover',
+                        )}
+                        src={u}
+                      />
+                      <img
+                        alt="Gallery"
+                        className={cn(
+                          'relative z-10 h-full w-full object-contain transition duration-300 ease-out hover:scale-[1.04]',
+                        )}
+                        src={u}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -389,10 +431,10 @@ export default function TourDetailPage() {
                     </thead>
                     <tbody>
                       {departures.map((d, idx) => {
-                        const st = statusBadge(d.status)
+                        const st = statusBadge(d.status, typeof d.seatsAvailable === 'number' ? d.seatsAvailable : null)
                         const depDisc = d.discountPercent ?? null
                         const depOrig = d.originalPriceAdult ?? null
-                        const isSoldout = d.status === 'soldout' || d.status === 'cancelled' || d.status === 'closed' || d.seatsAvailable <= 0
+                        const isSoldout = d.status === 'soldout' || d.status === 'cancelled' || d.status === 'closed' || (typeof d.seatsAvailable === 'number' && d.seatsAvailable <= 0)
                         return (
                           <tr className={cn(idx % 2 ? 'bg-slate-50/60' : 'bg-white')} key={idx}>
                             <td className="border border-slate-300 px-3 py-4 text-center font-semibold text-slate-900">{idx + 1}</td>
@@ -654,14 +696,33 @@ export default function TourDetailPage() {
                       }}
                       type="button"
                     >
-                      <div className="aspect-[16/10] bg-slate-100">
+                      <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 ring-1 ring-inset ring-slate-200/70">
                         {t.coverImageUrl ? (
-                          <img alt={t.title} className="h-full w-full object-cover transition group-hover:scale-[1.02]" src={t.coverImageUrl} />
+                          <div className="relative h-full w-full">
+                            <img
+                              alt=""
+                              aria-hidden="true"
+                              className={cn(
+                                'absolute inset-0 h-full w-full',
+                                'scale-110 blur-2xl opacity-40 saturate-150',
+                                'object-cover',
+                              )}
+                              src={t.coverImageUrl}
+                            />
+                            <img
+                              alt={t.title}
+                              className={cn(
+                                'relative z-10 h-full w-full transition duration-500 ease-out group-hover:scale-[1.04]',
+                                'object-contain',
+                              )}
+                              src={t.coverImageUrl}
+                            />
+                          </div>
                         ) : (
                           <div className="h-full w-full" />
                         )}
                         {disc ? (
-                          <span className="absolute left-3 top-3 inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-extrabold text-white shadow-md shadow-orange-500/30">
+                          <span className="absolute left-3 top-3 z-20 inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-extrabold text-white shadow-md shadow-orange-500/30 ring-1 ring-inset ring-white/20">
                             -{disc}%
                           </span>
                         ) : null}

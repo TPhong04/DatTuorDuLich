@@ -255,7 +255,7 @@ export default function NewsDetailPage() {
 
             {used.related.length > 0 && (
               <section className="mt-10">
-                <PageHeader subtitle={`${used.related.length} bài viết cùng chủ đề`} title="📚 Bạn có thể thích" />
+                <PageHeader title="📚 Bạn có thể thích" />
                 <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   {used.related.map((r) => {
                     const rm = POST_CATEGORY_META[r.category]

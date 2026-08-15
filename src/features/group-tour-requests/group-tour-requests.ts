@@ -132,6 +132,9 @@ export type GroupTourRequestListQuery = {
   pageSize?: number | string
   sort?: 'newest' | 'oldest' | 'priority' | 'follow_up'
   all?: string
+  minGuests?: number | string
+  won?: string
+  ming?: number | string
 }
 
 function qs(q: Record<string, unknown>) {

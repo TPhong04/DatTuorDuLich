@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { useToast } from '@/components/notifications/ToastProvider'
 import PageHeader from '@/components/ui/PageHeader'
+import { DateInput } from '@/components/ui/DateInput'
 import { AdminTour, adminCreateTour, adminGetTour, adminUpdateTour, adminUploadImage } from '@/features/admin/admin'
 import { cn } from '@/lib/utils'
 import { toInputDate } from '@/utils/date'
@@ -33,7 +34,7 @@ function emptyDraft(): Draft {
     totalBookings: 0,
     avgRating: null,
     reviewCount: 0,
-    isPublished: false,
+    isPublished: true,
     tags: [],
     itinerary: [],
     priceTable: [],
@@ -105,6 +106,75 @@ function formatMoney(n: number | null | undefined) {
   return n.toLocaleString('vi-VN')
 }
 
+function removeDiacritics(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+}
+
+function slugify(text: string): string {
+  const cleaned = preserveInline(text) ?? ''
+  if (!cleaned) return ''
+  return removeDiacritics(cleaned)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+}
+
+const REGION_KEYWORDS: Array<{ key: RegExp; code: string }> = [
+  { key: /phu[ ]*quoc|phuquoc/i, code: 'PHUQUOC' },
+  { key: /ha[ ]*long|halong|vinh[ ]*ha[ ]*long/i, code: 'HALONG' },
+  { key: /da[ ]*lat|dalat/i, code: 'DALAT' },
+  { key: /nha[ ]*trang|nhatrang/i, code: 'NHATRANG' },
+  { key: /hoi[ ]*an|hoian|hue|thua[ ]*thien/i, code: 'HOIANHUE' },
+  { key: /can[ ]*tho|cantho|dong[ ]*thap|sa[ ]*dec|tien[ ]*giang|hau[ ]*giang|vinh[ ]*long|an[ ]*giang|kien[ ]*giang|bac[ ]*lieu|ca[ ]*mau|soc[ ]*trang|ben[ ]*tre|tay/i, code: 'MIENTAY' },
+  { key: /saigon|ho[ ]*chi[ ]*minh|hcm|tphcm|bien[ ]*hoa|dong[ ]*nai/i, code: 'SAIGON' },
+  { key: /ha[ ]*noi|hanoi|hai[ ]*phong|haiphong|ninh[ ]*binh|thai[ ]*nguyen|bac[ ]*ninh|hung[ ]*yen|hai[ ]*duong|ha[ ]*giang|cao[ ]*bang|lang[ ]*son|bac[ ]*kan|tu[ ]*yen|quang[ ]*ninh/i, code: 'HANOI' },
+  { key: /da[ ]*nang|danang|quang[ ]*nam|quang[ ]*ngai|binh[ ]*dinh|phu[ ]*yen|khanh[ ]*hoa|binh[ ]*thuan|ninh[ ]*thuan|quy[ ]*nhon/i, code: 'DANANG' },
+  { key: /con[ ]*dao|conde|phu[ ]*quy|ly[ ]*son/i, code: 'ISLAND' },
+  { key: /moc[ ]*chau|mai[ ]*chau|sapa|sa[ ]*pa|mu[ ]*cang[ ]*chai|dien[ ]*bien|lai[ ]*chau|son[ ]*la|hoa[ ]*binh|mien[ ]*bac/i, code: 'MOUNTAIN' },
+  { key: /team[ ]*building|teambuilding|cong[ ]*ty|doanh[ ]*nghiep|hop[ ]*tac|su[ ]*kien/i, code: 'COMPANY' },
+]
+
+function buildTitleAcronym(title: string, type: 'retail' | 'group' | string): string {
+  const t = preserveInline(title) ?? ''
+  if (!t) return ''
+  const noDiacritics = removeDiacritics(t)
+  for (const { key, code } of REGION_KEYWORDS) {
+    if (key.test(noDiacritics)) return code
+  }
+  const tokens = noDiacritics
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !/^(tour|va|voi|ben|ngay|dem|nam|2d|3d|4d|5d|6d|7d|8d|9d|1[0-9]d|2[0-9]d|2n|3n|4n|5n|6n|7n|8n|9n|1[0-9]n|2[0-9]n|2d1n|3d2n|4d3n|5d4n|6d5n|7d6n|ks|khach|san|tour|the|vour|noi|dia|diem|noi|xuat|phat|gia|re|cao|cap|mua|he|thu|dong|xuan|nam|chot|gio)$/i.test(w))
+  const firstFew = tokens.slice(0, 4)
+  if (!firstFew.length) {
+    const raw = noDiacritics.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()
+    return raw || (type === 'group' ? 'DOAN' : 'TOUR')
+  }
+  const acronym = firstFew.join('').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return acronym.slice(0, 8) || (type === 'group' ? 'DOAN' : 'TOUR')
+}
+
+function random2Alphanumeric(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let out = ''
+  for (let i = 0; i < 2; i++) out += chars[Math.floor(Math.random() * chars.length)]
+  return out
+}
+
+function generateSemanticCode(title: string, type: 'retail' | 'group' | string, customRandom?: string): string {
+  const prefix = type === 'group' ? 'TD' : 'TL'
+  const acronym = buildTitleAcronym(title, type)
+  const rand = customRandom ?? random2Alphanumeric()
+  if (!acronym) return `${prefix}-${rand}`
+  return `${prefix}-${acronym}-${rand}`
+}
+
 export default function AdminTourEditorPage() {
   const { id } = useParams()
   const editing = Boolean(id)
@@ -118,6 +188,8 @@ export default function AdminTourEditorPage() {
   const [rawThemes, setRawThemes] = useState('')
   const [rawTags, setRawTags] = useState('')
   const [rawHighlights, setRawHighlights] = useState('')
+  const [slugTouched, setSlugTouched] = useState(false)
+  const [codeTouched, setCodeTouched] = useState(false)
 
   useEffect(() => {
     if (!editing || !id) return
@@ -138,10 +210,47 @@ export default function AdminTourEditorPage() {
         setRawThemes(Array.isArray(rest.themes) ? rest.themes.join(', ') : '')
         setRawTags(Array.isArray(rest.tags) ? rest.tags.join(', ') : '')
         setRawHighlights(Array.isArray(rest.highlights) ? rest.highlights.join('\n') : '')
+        setSlugTouched(Boolean(rest.slug))
+        setCodeTouched(Boolean(rest.code))
       })
       .catch((e) => toast.error((e as any)?.message || 'Không tải được tour'))
       .finally(() => setLoading(false))
   }, [editing, id])
+
+  useEffect(() => {
+    if (loading) return
+    if (!draft.title) return
+    if (!slugTouched) {
+      const nextSlug = slugify(draft.title)
+      if (nextSlug && nextSlug !== draft.slug) {
+        setDraft((d) => ({ ...d, slug: nextSlug }))
+      }
+    }
+    if (!codeTouched) {
+      const nextCode = generateSemanticCode(draft.title, draft.type)
+      if (nextCode && nextCode !== draft.code) {
+        setDraft((d) => ({ ...d, code: nextCode }))
+      }
+    }
+  }, [draft.title, draft.type, loading, slugTouched, codeTouched])
+
+  const regenerateSlug = () => {
+    const next = slugify(draft.title)
+    if (!next) {
+      toast.warning('Vui lòng nhập Tên tour trước khi tạo Slug.')
+      return
+    }
+    setDraft((d) => ({ ...d, slug: next }))
+    setSlugTouched(true)
+    toast.success('Đã tạo lại Slug từ Tên tour.')
+  }
+
+  const regenerateCode = () => {
+    const next = generateSemanticCode(draft.title, draft.type)
+    setDraft((d) => ({ ...d, code: next }))
+    setCodeTouched(true)
+    toast.success('Đã tạo lại Mã tour mới (không trùng với mã cũ).')
+  }
 
   useEffect(() => {
     if (editing) return
@@ -310,7 +419,6 @@ export default function AdminTourEditorPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Tạo/Chỉnh sửa tour để hiển thị giống mẫu Datviettour."
         title={editing ? 'Sửa tour' : 'Tạo tour'}
         right={
           <Link
@@ -326,7 +434,12 @@ export default function AdminTourEditorPage() {
         <div className="rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block md:col-span-2">
-              <div className="text-sm font-semibold text-slate-900">Tên tour</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900">Tên tour</div>
+                <div className="text-[11px] font-semibold text-slate-500">
+                  💡 Gõ tên tour → Slug & Mã tour sẽ <b className="text-orange-600">tự tạo</b> bên dưới nếu bạn chưa sửa chúng.
+                </div>
+              </div>
               <textarea
                 className="mt-2 min-h-16 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none ring-orange-400/40 focus:ring-4"
                 disabled={loading || saving}
@@ -336,26 +449,112 @@ export default function AdminTourEditorPage() {
               />
             </label>
 
-            <label className="block">
-              <div className="text-sm font-semibold text-slate-900">Slug</div>
-              <input
-                className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
-                disabled={loading || saving}
-                onChange={(e) => setDraft((d) => ({ ...d, slug: e.target.value }))}
-                placeholder="hcm-ninh-chu-nha-trang..."
-                value={draft.slug}
-              />
-            </label>
+            <div className="block">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900">Slug</div>
+                {slugTouched ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 ring-1 ring-inset ring-slate-200">
+                    ✏️ Bạn đã chỉnh
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                    ✨ Tự động theo tên
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4 font-mono lowercase"
+                  disabled={loading || saving}
+                  onChange={(e) => { setDraft((d) => ({ ...d, slug: e.target.value })); setSlugTouched(true) }}
+                  onBlur={(e) => { if (e.target.value) setSlugTouched(true) }}
+                  placeholder="tour-da-lat-xu-so-than-tien..."
+                  value={draft.slug}
+                />
+                <button
+                  type="button"
+                  disabled={loading || saving}
+                  onClick={regenerateSlug}
+                  title="Tạo lại slug từ tên tour"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-100 transition hover:bg-white hover:border-blue-200 hover:text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  ↺ Slug
+                </button>
+              </div>
+              {draft.slug ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-2xl bg-blue-50/60 px-3 py-2 text-[11px] ring-1 ring-inset ring-blue-100">
+                  <span className="font-semibold text-blue-900">🔗 URL công khai:</span>
+                  <code className="rounded-md bg-white px-2 py-1 font-mono text-blue-800 ring-1 ring-blue-100">/tours/{draft.slug}</code>
+                </div>
+              ) : null}
+            </div>
 
-            <label className="block">
-              <div className="text-sm font-semibold text-slate-900">Mã tour</div>
-              <input
-                className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
-                disabled={loading || saving}
-                onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
-                value={draft.code ?? ''}
-              />
-            </label>
+            <div className="block">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900">Mã tour</div>
+                {codeTouched ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 ring-1 ring-inset ring-slate-200">
+                    ✏️ Bạn đã chỉnh
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                    ✨ Tự động TL/TD
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  className="h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4 font-mono uppercase tracking-wider"
+                  disabled={loading || saving}
+                  onChange={(e) => { const v = (e.target.value || '').toUpperCase(); setDraft((d) => ({ ...d, code: v || null })); setCodeTouched(true) }}
+                  onBlur={(e) => { if (e.target.value) setCodeTouched(true) }}
+                  placeholder="VD: TL-DALAT-X7, TD-HALONG-B2..."
+                  value={draft.code ?? ''}
+                />
+                <button
+                  type="button"
+                  disabled={loading || saving}
+                  onClick={regenerateCode}
+                  title="Đổi sang mã tour mới (không trùng với mã cũ)"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-3.5 text-sm font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-100 transition hover:bg-indigo-100 hover:border-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  ↺ Mã
+                </button>
+              </div>
+              {draft.code ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-2xl bg-indigo-50/60 px-3 py-2 text-[11px] ring-1 ring-inset ring-indigo-100">
+                  <span className="font-semibold text-indigo-900">🧠 Phân tích mã:</span>
+                  {(() => {
+                    const parts = (draft.code || '').split('-').filter(Boolean)
+                    const [p, acronym, rand] = parts
+                    return (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {p ? (
+                          <span className={cn(
+                            'rounded-md px-2 py-1 font-mono font-bold ring-1 ring-inset',
+                            p === 'TL' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' :
+                            p === 'TD' ? 'bg-orange-50 text-orange-800 ring-orange-200' :
+                            'bg-slate-100 text-slate-700 ring-slate-200'
+                          )}>
+                            {p} = {p === 'TL' ? 'Tour khách LẺ' : p === 'TD' ? 'Tour ĐOÀN' : p}
+                          </span>
+                        ) : null}
+                        {acronym ? (
+                          <span className="rounded-md bg-white px-2 py-1 font-mono font-bold text-indigo-800 ring-1 ring-inset ring-indigo-200">
+                            {acronym} = Tên / Điểm đến
+                          </span>
+                        ) : null}
+                        {rand ? (
+                          <span className="rounded-md bg-white px-2 py-1 font-mono font-bold text-slate-700 ring-1 ring-inset ring-slate-200">
+                            {rand} = Random (tránh trùng)
+                          </span>
+                        ) : null}
+                      </div>
+                    )
+                  })()}
+                </div>
+              ) : null}
+            </div>
 
             <label className="block">
               <div className="text-sm font-semibold text-slate-900">Loại tour</div>
@@ -365,8 +564,8 @@ export default function AdminTourEditorPage() {
                 onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value as any }))}
                 value={draft.type}
               >
-                <option value="retail">Tour khách lẻ</option>
-                <option value="group">Tour khách đoàn</option>
+                <option value="retail">🧳 Tour khách lẻ (mã TL-) | Bán linh hoạt theo lịch</option>
+                <option value="group">👥 Tour khách đoàn (mã TD-) | Team Building / Công ty</option>
               </select>
             </label>
 
@@ -990,20 +1189,23 @@ export default function AdminTourEditorPage() {
                   <div className="mt-3 grid gap-3 md:grid-cols-4">
                     <label className="block">
                       <div className="text-sm font-semibold text-slate-900">Ngày khởi hành</div>
-                      <input
-                        className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none ring-orange-400/40 focus:ring-4"
-                        disabled={loading || saving}
-                        onChange={(e) =>
-                          setDraft((d) => ({
-                            ...d,
-                            departures: d.departures.map((x, i) =>
-                              i === idx ? { ...x, departureDate: e.target.value || toInputDate(new Date()) } : x,
-                            ),
-                          }))
-                        }
-                        type="date"
-                        value={toInputDate(dep.departureDate)}
-                      />
+                      <div className="mt-2">
+                        <DateInput
+                          size="lg"
+                          variant="admin"
+                          disabled={loading || saving}
+                          disabledPast={false}
+                          value={toInputDate(dep.departureDate) || null}
+                          onChange={(iso) =>
+                            setDraft((d) => ({
+                              ...d,
+                              departures: d.departures.map((x, i) =>
+                                i === idx ? { ...x, departureDate: iso || toInputDate(new Date()) } : x,
+                              ),
+                            }))
+                          }
+                        />
+                      </div>
                     </label>
                     <label className="block">
                       <div className="text-sm font-semibold text-slate-900">Tiêu chuẩn</div>

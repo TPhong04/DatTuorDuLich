@@ -1,4 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, NotFoundException } from '@nestjs/common'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger'
 
 import { ToursService } from './tours.service'
 import { createTourReviewDto } from './dto'
@@ -109,15 +116,91 @@ function toPublicTourDetail(t: any) {
   }
 }
 
+@ApiTags('Tours Public')
 @Controller('tours')
 export class ToursController {
   constructor(private readonly tours: ToursService) {}
 
   @Get()
-  async list(@Query('q') q?: string, @Query('region') region?: string, @Query('tag') tag?: string) {
+  @ApiOperation({
+    summary: 'Liệt kê danh sách tour công khai (published)',
+    description:
+      'QA: Endpoint công khai không cần auth. Trả mảng items[] dạng tourCard (gọn nhẹ: title, slug, cover, priceFrom, nextDeparture, seatsAvailable). Hỗ trợ 3 query filter: q (tìm kiếm fulltext title/summary/highlights), region (lọc theo miền/địa phương: Mien-Bac / Mien-Trung / Mien-Nam / Phu-Quoc / Da-Nang), tag (lọc theo tag như "biển" "núi" "địa trung ẩm thực"). Không phân trang, trả toàn bộ published.',
+  })
+  @ApiQuery({ name: 'q', required: false, description: 'Từ khóa tìm kiếm: title, summary, highlights (case-insensitive contains)', example: 'Hạ Long' })
+  @ApiQuery({ name: 'region', required: false, description: 'Lọc theo region tour (cột region trong Tour)', example: 'Mien-Bac' })
+  @ApiQuery({ name: 'tag', required: false, description: 'Lọc theo tag nằm trong mảng tags (tour.tags includes)', example: 'biển' })
+  @ApiQuery({ name: 'transport', required: false, description: 'Lọc theo phương tiện: bus (Xe/Limousine) hoặc flight (Máy bay) - match nội dung field transportText', example: 'flight' })
+  @ApiResponse({
+    status: 200,
+    description: '200 OK: Mảng danh sách tourCard công khai (chỉ isPublished=true).',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: '67f2a8b3c4d5e6f7a8b9c0d1' },
+              title: { type: 'string', example: 'Tour Hạ Long 2N1Đ - Du thuyền 5 sao' },
+              slug: { type: 'string', example: 'tour-ha-long-2n1d-du-thuyen-5-sao' },
+              code: { type: 'string', nullable: true, example: 'HAL-001' },
+              type: { type: 'string', enum: ['retail', 'group'], example: 'retail' },
+              region: { type: 'string', nullable: true, example: 'Mien-Bac' },
+              categories: { type: 'array', items: { type: 'string' }, example: ['Du lịch biển', 'Du lịch nghỉ dưỡng'] },
+              themes: { type: 'array', items: { type: 'string' } },
+              durationDays: { type: 'number', example: 2 },
+              durationNights: { type: 'number', example: 1 },
+              departureFrom: { type: 'string', nullable: true, example: 'Hà Nội' },
+              transportText: { type: 'string', nullable: true, example: 'Xe limousine 9 chỗ + Du thuyền' },
+              hotelText: { type: 'string', nullable: true, example: 'Ở du thuyền cabin biển hướng' },
+              coverImageUrl: { type: 'string', nullable: true, example: '/uploads/tours/halong-cover.jpg' },
+              highlights: { type: 'array', items: { type: 'string' }, example: ['Cảnh quan Vịnh Hạ Long di sản', 'Du thuyền 5 sao', 'Kayak hang Sửng Sốt'] },
+              tags: { type: 'array', items: { type: 'string' }, example: ['biển', 'vinh-di-san', 'di-san-thien-nhien'] },
+              totalBookings: { type: 'number', example: 1247 },
+              avgRating: { type: 'number', nullable: true, example: 4.8 },
+              reviewCount: { type: 'number', example: 312 },
+              priceFrom: { type: 'number', example: 2490000 },
+              originalPriceFrom: { type: 'number', nullable: true, example: 2990000 },
+              discountFrom: { type: 'number', nullable: true, example: 16 },
+              nextDepartureDate: { type: 'string', nullable: true, format: 'date-time', example: '2025-12-25T12:00:00.000Z' },
+              nextDepartureStandardText: { type: 'string', nullable: true, example: 'Thứ 7, Chủ Nhật hàng tuần' },
+              nextDeparturePriceAdult: { type: 'number', nullable: true, example: 2490000 },
+              nextDepartureOriginalPriceAdult: { type: 'number', nullable: true, example: 2990000 },
+              nextDepartureDiscountPercent: { type: 'number', nullable: true, example: 16 },
+              seatsAvailable: { type: 'number', nullable: true, example: 18 },
+              isPublished: { type: 'boolean', example: true },
+            },
+          },
+        },
+      },
+    },
+  })
+  async list(
+    @Query('q') q?: string,
+    @Query('region') region?: string,
+    @Query('tag') tag?: string,
+    @Query('transport') transport?: string,
+  ) {
     let items = await this.tours.listPublic()
     if (region) items = items.filter((t) => t.region === region)
     if (tag) items = items.filter((t) => Array.isArray(t.tags) && t.tags.includes(tag))
+    if (transport) {
+      const tLower = transport.trim().toLowerCase()
+      items = items.filter((t) => {
+        const tt = (t.transportText || '').toLowerCase()
+        if (tLower === 'flight') {
+          return tt.includes('máy bay') || tt.includes('may bay') || tt.includes('flight') || tt.includes('vé máy bay') || tt.includes('ve may bay')
+        }
+        if (tLower === 'bus') {
+          const hasFlight = tt.includes('máy bay') || tt.includes('may bay') || tt.includes('flight')
+          const hasBus = tt.includes('xe') || tt.includes('limousine') || tt.includes('ô tô') || tt.includes('o to') || tt.includes('bus') || tt.includes('coach')
+          return hasBus && !hasFlight
+        }
+        return tt.includes(tLower)
+      })
+    }
     if (q && q.trim()) {
       const kw = q.trim().toLowerCase()
       items = items.filter(
@@ -131,8 +214,23 @@ export class ToursController {
   }
 
   @Get(':slug')
+  @ApiOperation({
+    summary: 'Chi tiết tour theo slug (công khai)',
+    description:
+      'QA: Lấy thông tin đầy đủ của 1 tour: gallery, itinerary (ngày 1..N), priceTable, surcharges, departures list (id, date, price, seats), faq, pickupPoints, reviews (chỉ approved). Quan trọng: field departures[].id dùng để gọi POST /tours/:slug/bookings (truyền departureId).',
+  })
+  @ApiParam({ name: 'slug', description: 'Slug tour (duy nhất trong bảng tours). VD: tour-ha-long-2n1d-du-thuyen-5-sao', example: 'tour-ha-long-2n1d-du-thuyen-5-sao' })
+  @ApiResponse({
+    status: 200,
+    description: '200 OK: Thông tin chi tiết tour + mảng related tours liên quan (cùng region hoặc cùng category).',
+  })
+  @ApiResponse({
+    status: 404,
+    description: '404 Not Found: Không tìm thấy tour với slug đã cho HOẶC tour chưa được xuất bản (isPublished=false).',
+  })
   async get(@Param('slug') slug: string) {
     const t = await this.tours.findPublicBySlug(slug)
+    if (!t) throw new NotFoundException('Không tìm thấy tour')
     const related = await this.tours.listRelated(slug, 4)
     return {
       tour: toPublicTourDetail(t),
@@ -157,4 +255,3 @@ export class ToursController {
     }
   }
 }
-

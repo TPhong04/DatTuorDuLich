@@ -50,7 +50,7 @@ export default function AdminSettingsIntegrationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Chọn provider và các thông số công khai. Secrets sẽ để trong .env theo môi trường." title="Tích hợp" />
+      <PageHeader title="Tích hợp" />
       <form className="space-y-4 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <label className="block">
           <div className="text-sm font-semibold text-slate-900">Public Base URL</div>

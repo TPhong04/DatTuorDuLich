@@ -53,7 +53,7 @@ export default function AdminSettingsCompanyPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Tên công ty, hotline, email, địa chỉ, social links." title="Doanh nghiệp" />
+      <PageHeader title="Doanh nghiệp" />
       <form className="space-y-4 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">

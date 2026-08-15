@@ -119,7 +119,7 @@ export default function AdminSettingsLayout() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Cấu hình hệ thống: doanh nghiệp, hiển thị, đặt tour, thanh toán, thông báo." title="Cấu hình" />
+      <PageHeader title="Cấu hình" />
 
       <div className="overflow-hidden rounded-3xl bg-white p-4 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100">
         <div className="flex flex-wrap gap-2">

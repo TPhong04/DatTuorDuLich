@@ -128,6 +128,7 @@ export class ReviewsService {
     if (!this.isCustomer(actor)) throw new ForbiddenException('Chỉ khách hàng mới được viết đánh giá')
     if (String((booking as any).createdBy) !== String(actor.sub)) throw new ForbiddenException('Đây không phải đơn hàng của bạn')
     if (booking.status === 'cancelled') throw new ForbiddenException('Đơn hàng đã bị hủy, không được đánh giá')
+    if (booking.status !== 'completed') throw new ForbiddenException('Chỉ được đánh giá đơn tour đã hoàn thành (trạng thái completed)')
     const endDate = tripEndDate(booking.departureDate, tour.durationDays)
     const today = new Date()
     if (today.getTime() <= endDate.getTime()) throw new ForbiddenException('Tour chưa kết thúc, bạn có thể đánh giá sau khi tour kết thúc')
@@ -249,7 +250,7 @@ export class ReviewsService {
   async myPendingReviewBookings(customerId: string, _dto: { page: number; pageSize: number }) {
     const customerOid = new Types.ObjectId(customerId)
     const bookings = await this.bookingModel
-      .find({ createdBy: customerOid, status: { $in: ['confirmed', 'in_progress', 'completed'] } })
+      .find({ createdBy: customerOid, status: { $in: ['completed'] } })
       .sort({ departureDate: -1 })
       .lean()
     const tourIds = [...new Set(bookings.map((b) => String(b.tourId)))]
@@ -269,7 +270,7 @@ export class ReviewsService {
       const endDate = tripEndDate(b.departureDate, tdur)
       const windowEnd = addDays(endDate, REVIEW_CREATE_WINDOW_DAYS_AFTER_TRIP_END)
       const canReview =
-        (b.status === 'completed' || b.status === 'confirmed' || b.status === 'in_progress') &&
+        b.status === 'completed' &&
         today.getTime() > endDate.getTime() &&
         today.getTime() <= windowEnd.getTime() &&
         !reviewedBookingIds.has(String(b._id ?? b.id))

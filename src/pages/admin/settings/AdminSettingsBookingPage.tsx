@@ -44,7 +44,7 @@ export default function AdminSettingsBookingPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Trạng thái mặc định, giữ chỗ, nội dung chính sách huỷ/đổi." title="Đặt tour" />
+      <PageHeader title="Đặt tour" />
       <form className="space-y-4 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block">

@@ -56,7 +56,7 @@ export default function AdminSettingsNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Bật/tắt kênh và template nội dung (v1.0 làm core trước, tích hợp gửi thật sau)." title="Thông báo" />
+      <PageHeader title="Thông báo" />
       <form className="space-y-4 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <div className="grid gap-3 md:grid-cols-4">
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">

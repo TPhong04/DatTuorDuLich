@@ -68,6 +68,27 @@ export class UsersService {
     await this.userModel.updateOne({ _id: userId }, { passwordResetAt: at }).exec()
   }
 
+  async setTotp(
+    userId: string,
+    patch: { enabled?: boolean; secretEncrypted?: string | null; backupCodes?: string[] },
+  ) {
+    const update: Record<string, unknown> = {}
+    if (typeof patch.enabled === 'boolean') update.totpEnabled = patch.enabled
+    if ('secretEncrypted' in patch) update.totpSecretEncrypted = patch.secretEncrypted ?? null
+    if (Array.isArray(patch.backupCodes)) update.totpBackupCodes = patch.backupCodes
+    await this.userModel.updateOne({ _id: userId }, update).exec()
+  }
+
+  async consumeTotpBackupCode(userId: string, backupCode: string): Promise<boolean> {
+    const user = await this.findById(userId)
+    if (!user || !Array.isArray(user.totpBackupCodes) || user.totpBackupCodes.length === 0) return false
+    const matched = user.totpBackupCodes.findIndex((c) => c?.toUpperCase() === backupCode.toUpperCase())
+    if (matched < 0) return false
+    const remaining = user.totpBackupCodes.filter((_, i) => i !== matched)
+    await this.userModel.updateOne({ _id: userId }, { totpBackupCodes: remaining }).exec()
+    return true
+  }
+
   async adminUpdateUser(userId: string, input: AdminUserUpdate) {
     const update: Record<string, unknown> = {}
     if (input.role) update.role = input.role

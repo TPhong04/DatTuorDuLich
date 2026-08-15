@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import PageHeader from '@/components/ui/PageHeader'
+import { DateRangeInput } from '@/components/ui/DateRangeInput'
 import { useToast } from '@/components/notifications/ToastProvider'
 import {
   Booking,
@@ -64,18 +65,39 @@ function passengerTypeColor(t: string) {
 
 export default function AdminBookingsPage() {
   const toast = useToast()
-  const [sp] = useSearchParams()
+  const [sp, setSp] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<Booking[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(Math.max(1, Number(sp.get('page') || '1')))
   const [limit] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
 
-  const [fStatus, setFStatus] = useState<BookingStatus | ''>('')
-  const [fFrom, setFFrom] = useState('')
-  const [fTo, setFTo] = useState('')
-  const [fQ, setFQ] = useState('')
+  const [fStatus, setFStatus] = useState<BookingStatus | ''>((sp.get('status') as BookingStatus | '') || '')
+  const [fFrom, setFFrom] = useState(sp.get('from') || '')
+  const [fTo, setFTo] = useState(sp.get('to') || '')
+  const [fQ, setFQ] = useState(sp.get('q') || '')
+
+  const applySearch = useCallback((next: Partial<Record<string, string>>) => {
+    const merged = new URLSearchParams(sp)
+    merged.delete('page')
+    for (const [k, v] of Object.entries(next)) {
+      if (v === '' || v === null || v === undefined) merged.delete(k)
+      else merged.set(k, String(v))
+    }
+    setSp(merged, { replace: true })
+  }, [sp, setSp])
+
+  useEffect(() => {
+    applySearch({
+      status: fStatus,
+      from: fFrom,
+      to: fTo,
+      q: fQ,
+      page: page > 1 ? String(page) : '',
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fStatus, fFrom, fTo, fQ, page])
 
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -200,7 +222,6 @@ export default function AdminBookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Quản lý toàn bộ đơn đặt tour: xác nhận, hủy, trả chỗ, ghi chú nội bộ, theo dõi trạng thái thanh toán."
         title="Quản lý Đơn đặt"
         right={
           <div className="flex items-center gap-2">
@@ -243,15 +264,17 @@ export default function AdminBookingsPage() {
               <option value="cancelled">Đã hủy</option>
             </select>
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Từ ngày</label>
-            <input type="date" value={fFrom} max={fTo || undefined} onChange={(e) => setFFrom(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-blue-100 focus:border-orange-400 focus:ring-4" />
+          <div className="md:col-span-5">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Khoảng ngày đặt</label>
+            <DateRangeInput
+              size="md"
+              variant="admin"
+              from={fFrom || null}
+              to={fTo || null}
+              onChange={(next) => { setFFrom(next.from || ''); setFTo(next.to || '') }}
+            />
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Đến ngày</label>
-            <input type="date" value={fTo} min={fFrom || undefined} onChange={(e) => setFTo(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-blue-100 focus:border-orange-400 focus:ring-4" />
-          </div>
-          <div className="md:col-span-5 flex items-end gap-2">
+          <div className="md:col-span-7 flex items-end gap-2">
             <div className="min-w-0 flex-1">
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</label>
               <input value={fQ} onChange={(e) => setFQ(e.target.value)} placeholder="Mã / Tour / Tên KH / SĐT / Email" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-blue-100 focus:border-orange-400 focus:ring-4" />

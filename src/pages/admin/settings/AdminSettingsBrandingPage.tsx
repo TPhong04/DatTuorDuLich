@@ -68,7 +68,7 @@ export default function AdminSettingsBrandingPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Logo header/footer, favicon, topbar text, màu nhận diện." title="Nhận diện" />
+      <PageHeader title="Nhận diện" />
 
       <form className="space-y-5 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <div className="grid gap-4 md:grid-cols-3">

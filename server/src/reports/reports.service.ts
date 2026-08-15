@@ -53,6 +53,7 @@ export type MonthlyAggRow = {
   completedCount: number
   cancelledCount: number
   revenue: number
+  completedRevenue?: number
   passengerTotal: number
   aov: number
   cancellationRate: number
@@ -447,8 +448,9 @@ export class ReportsService {
         if (booking.status === 'completed') completedRevenue.push(Number(booking.totalAmount || 0))
       }
       if (isCancelled) kpis.bookingCountCancelled += 1
-      kpis.grossRevenue += Number(booking.subtotalAmount || 0) + Number(booking.surchargeAmount || 0)
-      if (!isCancelled) kpis.netRevenue += Number(booking.totalAmount || 0)
+      const isRevenueEligible = booking.status === 'completed' || booking.status === 'confirmed' || booking.status === 'in_progress'
+      if (!isCancelled) kpis.grossRevenue += Number(booking.subtotalAmount || 0) + Number(booking.surchargeAmount || 0)
+      if (isRevenueEligible) kpis.netRevenue += Number(booking.totalAmount || 0)
       kpis.passengerAdult += Number(booking.adultCount || 0)
       kpis.passengerChild += Number(booking.childCount || 0)
       kpis.passengerInfant += Number(booking.infantCount || 0)
@@ -469,9 +471,9 @@ export class ReportsService {
       }
       if (!isCancelled) kpis.outstandingTotal += outstanding
 
-      categoryAgg.set(cat.category, (categoryAgg.get(cat.category) ?? 0) + (isCancelled ? 0 : Number(booking.totalAmount || 0)))
-      paymentMethodAgg.set(booking.paymentMethod, (paymentMethodAgg.get(booking.paymentMethod) ?? 0) + (isCancelled ? 0 : Number(booking.totalAmount || 0)))
-      regionAgg.set(cat.regionLabel, (regionAgg.get(cat.regionLabel) ?? 0) + (isCancelled ? 0 : Number(booking.totalAmount || 0)))
+      categoryAgg.set(cat.category, (categoryAgg.get(cat.category) ?? 0) + (isRevenueEligible ? Number(booking.totalAmount || 0) : 0))
+      paymentMethodAgg.set(booking.paymentMethod, (paymentMethodAgg.get(booking.paymentMethod) ?? 0) + (isRevenueEligible ? Number(booking.totalAmount || 0) : 0))
+      regionAgg.set(cat.regionLabel, (regionAgg.get(cat.regionLabel) ?? 0) + (isRevenueEligible ? Number(booking.totalAmount || 0) : 0))
 
       const createdAtDay = toISO(booking.createdAt instanceof Date ? booking.createdAt : new Date(booking.createdAt))
       const buck = buckets.get(createdAtDay)
@@ -488,7 +490,7 @@ export class ReportsService {
         code: tourCode,
         revenue: 0,
       }
-      agg.revenue += isCancelled ? 0 : Number(booking.totalAmount || 0)
+      agg.revenue += isRevenueEligible ? Number(booking.totalAmount || 0) : 0
       tourAgg.set(tKey, agg)
 
       // Month row
@@ -501,19 +503,23 @@ export class ReportsService {
         completedCount: 0,
         cancelledCount: 0,
         revenue: 0,
+        completedRevenue: 0,
         passengerTotal: 0,
         aov: 0,
         cancellationRate: 0,
       }
       mRow.bookingCount += 1
-      if (booking.status === 'completed' || booking.status === 'confirmed' || booking.status === 'in_progress') mRow.completedCount += 1
+      if (booking.status === 'completed' || booking.status === 'confirmed' || booking.status === 'in_progress') {
+        mRow.completedCount += 1
+        mRow.revenue += Number(booking.totalAmount || 0)
+        ;(mRow as any).completedRevenue = ((mRow as any).completedRevenue || 0) + (booking.status === 'completed' ? Number(booking.totalAmount || 0) : 0)
+      }
       if (booking.status === 'cancelled') mRow.cancelledCount += 1
       if (!isCancelled) {
-        mRow.revenue += Number(booking.totalAmount || 0)
         mRow.passengerTotal +=
           Number(booking.adultCount || 0) + Number(booking.childCount || 0) + Number(booking.infantCount || 0)
       }
-      monthlyMap.set(mKey, mRow)
+      monthlyMap.set(mKey, mRow as any)
 
       // Outstanding list
       if (!isCancelled && outstanding > 0) {
@@ -610,10 +616,10 @@ export class ReportsService {
       }))
 
     const monthly: MonthlyAggRow[] = Array.from(monthlyMap.values())
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({
+      .sort((a: any, b: any) => a.key.localeCompare(b.key))
+      .map((r: any) => ({
         ...r,
-        aov: r.completedCount === 0 ? 0 : r.revenue / r.completedCount,
+        aov: r.completedCount === 0 ? 0 : (r.completedRevenue ?? 0) / r.completedCount,
         cancellationRate: r.bookingCount === 0 ? 0 : (r.cancelledCount / r.bookingCount) * 100,
       }))
     // Fill missing months for current year
@@ -630,6 +636,7 @@ export class ReportsService {
             completedCount: 0,
             cancelledCount: 0,
             revenue: 0,
+            completedRevenue: 0,
             passengerTotal: 0,
             aov: 0,
             cancellationRate: 0,

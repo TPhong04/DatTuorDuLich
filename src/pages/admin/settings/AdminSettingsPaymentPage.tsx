@@ -41,7 +41,7 @@ export default function AdminSettingsPaymentPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader subtitle="Bật/tắt đặt cọc, % đặt cọc, hướng dẫn thanh toán mô phỏng." title="Thanh toán" />
+      <PageHeader title="Thanh toán" />
       <form className="space-y-4 rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100" onSubmit={onSubmit}>
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <input checked={enableDeposit} className="h-4 w-4" onChange={(e) => setEnableDeposit(e.target.checked)} type="checkbox" />

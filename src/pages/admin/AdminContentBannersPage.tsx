@@ -122,8 +122,8 @@ export default function AdminContentBannersPage() {
       openInNewTab: targetType === 'external' ? openInNewTab : false,
       order: nextOrder,
       isActive,
-      startAt: startAt ? new Date(startAt).toISOString() : null,
-      endAt: endAt ? new Date(endAt).toISOString() : null,
+      startAt: toDateOrNull(startAt),
+      endAt: toDateOrNull(endAt),
     }
 
     try {
@@ -186,7 +186,6 @@ export default function AdminContentBannersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="Quản lý banner/slider trang chủ: thêm, sắp xếp, bật/tắt."
         title="Banners"
         right={
           <button
@@ -442,4 +441,12 @@ function toDateTimeLocalValue(iso: string | null | undefined) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+function toDateOrNull(raw: string): string | null {
+  const s = String(raw ?? '').trim()
+  if (!s) return null
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString()
 }

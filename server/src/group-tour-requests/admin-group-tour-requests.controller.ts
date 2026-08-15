@@ -42,15 +42,24 @@ export class AdminGroupTourRequestsController {
     @Query('page') page: string | undefined,
     @Query('pageSize') pageSize: string | undefined,
     @Query('sort') sort: 'newest' | 'oldest' | 'priority' | 'follow_up' | undefined,
+    @Query('ming') minGuestsRaw: string | undefined,
+    @Query('won') won: string | undefined,
   ) {
     const actorId = new Types.ObjectId(u.sub)
+    const minGuestsNum = minGuestsRaw !== undefined && minGuestsRaw !== '' ? Number(minGuestsRaw) : NaN
+    const minGuests = Number.isFinite(minGuestsNum) && minGuestsNum > 0 ? minGuestsNum : undefined
+    let effectiveStatus: GroupTourRequestStatus | GroupTourRequestStatus[] | undefined = status
+    if (won === '1' || won === 'true') {
+      effectiveStatus = ['won', 'converted_booking'] as GroupTourRequestStatus[]
+    }
     const res = await this.svc.list({
-      status, priority, assignedStaffId,
+      status: effectiveStatus, priority, assignedStaffId,
       mine: mine === '1' || mine === 'true',
       searchKeyword,
       page: Number(page) || 1,
       pageSize: Number(pageSize) || 25,
       sort,
+      minGuests,
     }, actorId)
     return { ok: true, ...res }
   }

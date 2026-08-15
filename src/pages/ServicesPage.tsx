@@ -24,9 +24,7 @@ export default function ServicesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        subtitle="v1.0 triển khai dạng trang giới thiệu + form yêu cầu (sẽ nâng cấp đặt dịch vụ online ở v1.1)."
-        title="Dịch vụ"
-      />
+        title="Dịch vụ" />
       <div className="grid gap-4 md:grid-cols-3">
         {cards.map((c) => (
           <div key={c.to} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

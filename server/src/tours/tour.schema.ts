@@ -135,7 +135,7 @@ export class Tour {
   @Prop({ type: Number, default: 0 })
   reviewCount!: number
 
-  @Prop({ type: Boolean, required: true, default: false })
+  @Prop({ type: Boolean, required: true, default: true })
   isPublished!: boolean
 
   @Prop({

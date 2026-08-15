@@ -163,8 +163,9 @@ export class DashboardsService {
 
     for (const b of allBookings) {
       const isCancelled = b.status === 'cancelled'
+      const isRevenueEligible = b.status === 'completed' || b.status === 'confirmed' || b.status === 'in_progress'
       kpis.bookingCount += 1
-      if (!isCancelled) {
+      if (isRevenueEligible) {
         kpis.bookingRevenueTotal += Number(b.totalAmount || 0)
         const pax = Number(b.adultCount || 0) + Number(b.childCount || 0) + Number(b.infantCount || 0)
         kpis.passengerTotal += pax
@@ -183,7 +184,7 @@ export class DashboardsService {
       const key = String(b.tourId || title)
       const agg = byTourStats.get(key) || { tourId: b.tourId as Types.ObjectId | null, title, code, pax: 0, revenue: 0 }
       agg.pax += Number(b.adultCount || 0) + Number(b.childCount || 0) + Number(b.infantCount || 0)
-      if (!isCancelled) agg.revenue += Number(b.totalAmount || 0)
+      if (isRevenueEligible) agg.revenue += Number(b.totalAmount || 0)
       byTourStats.set(key, agg)
 
       const cat = pickTourCategory(

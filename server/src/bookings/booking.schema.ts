@@ -10,6 +10,7 @@ export type BookingStatus =
   | 'in_progress'
   | 'completed'
   | 'cancelled'
+  | 'expired'
 
 export type BookingPaymentMethod = 'hold' | 'bank_transfer' | 'online'
 export type BookingPaymentStatus = 'unpaid' | 'partial' | 'paid'
@@ -135,7 +136,7 @@ export class Booking {
   @Prop({
     type: String,
     required: true,
-    enum: ['pending', 'new', 'confirmed', 'in_progress', 'completed', 'cancelled'],
+    enum: ['pending', 'new', 'confirmed', 'in_progress', 'completed', 'cancelled', 'expired'],
     default: 'new',
     index: true,
   })
@@ -183,3 +184,9 @@ BookingSchema.index({ tourId: 1, departureDate: 1 })
 BookingSchema.index({ status: 1, createdAt: -1 })
 BookingSchema.index({ createdBy: 1, createdAt: -1 })
 BookingSchema.index({ 'contact.phone': 1 })
+BookingSchema.index({ status: 1, departureDate: 1, createdAt: -1 }, { name: 'reports_status_departure_created' })
+BookingSchema.index({ createdBy: 1, status: 1, createdAt: -1 }, { name: 'customer_mybookings_status_created' })
+BookingSchema.index({ assignedStaffIds: 1, status: 1, createdAt: -1 }, { name: 'staff_assigned_status_created_multikey' })
+BookingSchema.index({ paymentStatus: 1, createdAt: -1 }, { name: 'finance_paymentstatus_created_outstanding' })
+BookingSchema.index({ paymentStatus: 1, status: 1, createdAt: -1 }, { name: 'finance_payment_and_status_created' })
+BookingSchema.index({ tourId: 1, status: 1, departureDate: 1 }, { name: 'tour_bookings_by_tourid_status_departure' })

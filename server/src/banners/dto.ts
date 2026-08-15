@@ -1,11 +1,16 @@
 import { z } from 'zod'
 
 const dateDto = z
-  .string()
-  .trim()
-  .min(1)
-  .refine((v) => !Number.isNaN(Date.parse(v)))
-  .transform((v) => new Date(v))
+  .union([z.string().trim(), z.null(), z.date()])
+  .transform((v) => {
+    if (v === null || v === undefined) return null
+    if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v
+    const s = String(v).trim()
+    if (!s) return null
+    const d = new Date(s)
+    return Number.isNaN(d.getTime()) ? null : d
+  })
+  .refine((v) => v === null || v instanceof Date)
 
 export const bannerTargetTypeDto = z.enum(['none', 'internal', 'external'])
 

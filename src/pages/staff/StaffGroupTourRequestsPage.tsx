@@ -18,8 +18,9 @@ import {
   markStaffGroupTourRequestWon,
   totalGroupTourGuests,
 } from '@/features/group-tour-requests/group-tour-requests'
+import { GtrTodosChecklist } from '@/features/todos/GtrTodosChecklist'
 import clsx from 'clsx'
-import { Users, Phone, Building2, MapPin, CalendarDays, AlertTriangle, CheckCircle2, X } from 'lucide-react'
+import { Users, Phone, Building2, MapPin, CalendarDays, AlertTriangle, CheckCircle2, X, Eye } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/utils/date'
 
 const TABS = [
@@ -56,6 +57,7 @@ export default function StaffGroupTourRequestsPage() {
   const [wonOpen, setWonOpen] = useState<{ row: GroupTourRequest; note: string } | null>(null)
   const [lostOpen, setLostOpen] = useState<{ row: GroupTourRequest; reason: string } | null>(null)
   const [quoteOpen, setQuoteOpen] = useState<{ row: GroupTourRequest; summary: string } | null>(null)
+  const [detailOpen, setDetailOpen] = useState<{ row: GroupTourRequest; tab: 'info' | 'checklist' } | null>(null)
   useEffect(() => {
     const t = setTimeout(() => {
       setSearchDeb(search)
@@ -129,7 +131,6 @@ export default function StaffGroupTourRequestsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        subtitle="Danh sách yêu cầu Tour đoàn được quản lý giao cho bạn. Ưu tiên KHẨN CẤP trước, sau đó theo giờ theo dõi Follow-up."
         title="👔 Tour đoàn (Của tôi)"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -351,6 +352,7 @@ export default function StaffGroupTourRequestsPage() {
                     </td>
                     <td className="px-6 py-5 pr-7">
                       <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button onClick={() => setDetailOpen({ row: r, tab: (r.status === 'won' || r.status === 'converted_booking') ? 'checklist' : 'info' })} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-white px-4.5 text-[10px] 2xl:text-xs font-black uppercase text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50 hover:border-blue-200 whitespace-nowrap"><Eye size={14} />Chi tiết</button>
                         <a href={`tel:${r.contactPhone}`} className="inline-flex h-11 items-center gap-2 rounded-2xl bg-blue-600 px-4.5 text-[10px] 2xl:text-xs font-black uppercase text-white shadow-sm shadow-blue-600/10 hover:bg-blue-700 whitespace-nowrap">📞 Gọi</a>
                         <button disabled={notMine} onClick={async () => {
                           try {
@@ -481,6 +483,155 @@ export default function StaffGroupTourRequestsPage() {
                   setLostOpen(null); setStale(true); await load()
                 } catch (err) { toast.error((err as any)?.message || 'Lỗi.') }
               }} className="h-11 inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-5 text-xs font-black uppercase text-white hover:bg-rose-700 shadow-sm shadow-rose-600/10">❌ Xác nhận hủy</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {detailOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setDetailOpen(null)} />
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-[920px] bg-white shadow-2xl flex flex-col">
+            <div className="px-6 pt-5 pb-4 border-b border-slate-200 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase text-indigo-700 ring-1 ring-indigo-100">👔 Staff · Chi tiết Tour đoàn</span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 font-mono text-sm font-black text-white">{detailOpen.row.code}</span>
+                </div>
+                <div className="mt-2 text-2xl 2xl:text-3xl font-black text-slate-900 truncate">{detailOpen.row.companyOrGroupName} · <span className="text-orange-600">{detailOpen.row.destination}</span></div>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black uppercase ring-1', GROUP_TOUR_STATUS_META[detailOpen.row.status]?.chip)}><span className={clsx('h-2 w-2 rounded-full', GROUP_TOUR_STATUS_META[detailOpen.row.status]?.dot)} />{GROUP_TOUR_STATUS_META[detailOpen.row.status]?.label}</span>
+                  <span className={clsx('inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ring-1', GROUP_TOUR_PRIORITY_META[detailOpen.row.priority]?.chip)}>{GROUP_TOUR_PRIORITY_META[detailOpen.row.priority]?.icon}{GROUP_TOUR_PRIORITY_META[detailOpen.row.priority]?.label}</span>
+                  {detailOpen.row.wonAt ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">🏆 Won lúc {formatDateTime(detailOpen.row.wonAt)}</span> : null}
+                </div>
+              </div>
+              <button onClick={() => setDetailOpen(null)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"><X size={18} /></button>
+            </div>
+            <div className="px-6 pt-4 border-b border-slate-100 flex items-center gap-1">
+              {[
+                { key: 'info' as const, label: 'ℹ️ Thông tin Tour đoàn', badge: null },
+                { key: 'checklist' as const, label: '🗂 Checklist Operation (Won)', badge: 'NEW' },
+              ].map((t) => {
+                const active = detailOpen.tab === t.key
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setDetailOpen({ ...detailOpen, tab: t.key })}
+                    className={clsx(
+                      'relative inline-flex shrink-0 items-center gap-2 rounded-t-2xl px-5 py-3 text-sm font-black uppercase transition',
+                      active ? 'bg-white text-indigo-700 shadow-[0_1px_0_0_rgb(255,255,255),inset_0_2px_0_0_#4f46e5]' : 'text-slate-500 hover:bg-slate-50',
+                    )}
+                  >
+                    <span>{t.label}</span>
+                    {t.badge ? <span className="rounded-full bg-gradient-to-r from-orange-500 to-rose-500 px-2 py-0.5 text-[10px] font-black uppercase text-white">{t.badge}</span> : null}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-slate-50/40">
+              {detailOpen.tab === 'info' ? (
+                <div className="space-y-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">Thông tin liên hệ</div>
+                      <div className="flex items-start gap-3.5">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-xl font-black text-white shadow-sm ring-2 ring-blue-50/80">{detailOpen.row.contactName.slice(0, 1).toUpperCase()}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-black text-slate-900 text-lg flex items-center gap-2"><Users size={16} className="text-slate-400 shrink-0" />{detailOpen.row.contactName}</div>
+                          <a href={`tel:${detailOpen.row.contactPhone}`} className="mt-1 flex items-center gap-2 text-sm font-bold text-blue-700 hover:underline whitespace-nowrap"><Phone size={14} />{detailOpen.row.contactPhone}</a>
+                          {detailOpen.row.contactRole ? <div className="mt-1 text-sm text-slate-500">💼 {detailOpen.row.contactRole}</div> : null}
+                          {detailOpen.row.contactEmail ? <div className="mt-1 text-sm text-slate-500 truncate">✉️ {detailOpen.row.contactEmail}</div> : null}
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 pt-3 border-t border-slate-100">
+                        <Building2 size={18} className="mt-0.5 text-blue-600 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900 text-base break-words">{detailOpen.row.companyOrGroupName}</div>
+                          {detailOpen.row.companyTaxCode ? <div className="mt-0.5 text-xs 2xl:text-[13px] text-slate-500">MST: {detailOpen.row.companyTaxCode}</div> : null}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">Hành trình & Số khách</div>
+                      <div className="flex items-start gap-3">
+                        <MapPin size={18} className="mt-0.5 text-orange-500 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-base font-black text-slate-900">Đích đến: <span className="text-orange-600">{detailOpen.row.destination}</span></div>
+                          {detailOpen.row.departureCity ? <div className="mt-0.5 text-sm text-slate-500">🚩 Khởi hành từ: {detailOpen.row.departureCity}</div> : null}
+                          {detailOpen.row.approximateDurationText ? <div className="mt-0.5 text-sm text-slate-500">⏱ Thời gian: {detailOpen.row.approximateDurationText}</div> : null}
+                          <div className="mt-1 text-sm text-slate-500 flex items-center gap-1.5"><CalendarDays size={14} />Ngày đi ưu tiên: <b className="text-slate-700">{detailOpen.row.preferredStartDate ? formatDate(detailOpen.row.preferredStartDate) : 'Chưa xác định'}</b>{detailOpen.row.preferredEndDate ? ` → ${formatDate(detailOpen.row.preferredEndDate)}` : ''}</div>
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100 flex items-center gap-4">
+                        <div className="text-center px-3 py-2 rounded-2xl bg-slate-50 border border-slate-100 min-w-[80px]">
+                          <div className="text-2xl font-black text-slate-900 tabular-nums">{totalGroupTourGuests(detailOpen.row)}</div><div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Tổng KH</div>
+                        </div>
+                        <div className="text-center px-3 py-2 rounded-2xl bg-slate-50 border border-slate-100 min-w-[70px]">
+                          <div className="text-xl font-black text-slate-900 tabular-nums">{detailOpen.row.adultCount}</div><div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">NL</div>
+                        </div>
+                        <div className="text-center px-3 py-2 rounded-2xl bg-orange-50 border border-orange-100 min-w-[70px]">
+                          <div className="text-xl font-black text-orange-700 tabular-nums">{detailOpen.row.childCount}</div><div className="text-[11px] font-bold text-orange-600 uppercase tracking-wide">TE</div>
+                        </div>
+                        <div className="text-center px-3 py-2 rounded-2xl bg-emerald-50 border border-emerald-100 min-w-[70px]">
+                          <div className="text-xl font-black text-emerald-700 tabular-nums">{detailOpen.row.infantCount}</div><div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wide">EB</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-500">Ngân sách & Báo giá</div>
+                      <div className="text-xs 2xl:text-[13px] font-bold text-slate-500">Đã báo giá: <b className="text-slate-700">{detailOpen.row.quoteCount}</b> lần</div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        {detailOpen.row.budgetPerPersonVnd ? <div className="text-2xl 2xl:text-3xl font-black tabular-nums text-orange-600 whitespace-nowrap">{formatMoney(detailOpen.row.budgetPerPersonVnd)}đ<span className="text-xs 2xl:text-[13px] font-semibold text-slate-400 ml-1.5">/khách</span></div> : <div className="text-sm font-bold text-rose-600">⚠️ Chưa có ngân sách / khách</div>}
+                        {detailOpen.row.totalBudgetVnd ? <div className="mt-1.5 text-sm text-slate-500">Tổng dự kiến: <b className="font-black text-slate-700 tabular-nums">{formatMoney(detailOpen.row.totalBudgetVnd)}đ</b></div> : null}
+                      </div>
+                      <div>
+                        {detailOpen.row.lastQuoteSummary ? (
+                          <div className="text-sm text-emerald-700 border-l-2 border-emerald-300 pl-3 bg-emerald-50/40 py-2.5 pr-3 rounded-r-xl font-semibold whitespace-pre-wrap">💰 {detailOpen.row.lastQuoteSummary}</div>
+                        ) : (
+                          <div className="text-sm text-rose-600 bg-rose-50 rounded-xl px-3 py-2.5 ring-1 ring-rose-100 inline-flex items-center gap-1.5 font-semibold">⚠️ Chưa gửi báo giá → Bấm <b>💵 Báo giá</b> để gửi</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                    <div className="text-xs font-black uppercase tracking-wide text-slate-500">Dịch vụ yêu cầu & Yêu cầu đặc biệt</div>
+                    <div className="flex flex-wrap gap-2">
+                      {detailOpen.row.servicesPreference.needVisa ? <span className="rounded-full bg-violet-50 px-4 py-1.5 text-xs font-bold text-violet-700 ring-1 ring-violet-100 whitespace-nowrap">🛂 Visa</span> : null}
+                      {detailOpen.row.servicesPreference.needFlight ? <span className="rounded-full bg-sky-50 px-4 py-1.5 text-xs font-bold text-sky-700 ring-1 ring-sky-100 whitespace-nowrap">✈️ Vé máy bay</span> : null}
+                      {detailOpen.row.servicesPreference.needBus ? <span className="rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 whitespace-nowrap">🚌 Xe du lịch</span> : null}
+                      {detailOpen.row.servicesPreference.needHotel ? <span className="rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 ring-1 ring-blue-100 whitespace-nowrap">🏨 Khách sạn {detailOpen.row.hotelClassRequested || ''}</span> : null}
+                      {detailOpen.row.servicesPreference.needMeals ? <span className="rounded-full bg-orange-50 px-4 py-1.5 text-xs font-bold text-orange-700 ring-1 ring-orange-100 whitespace-nowrap">🍱 Bữa ăn</span> : null}
+                      {detailOpen.row.servicesPreference.needGuide ? <span className="rounded-full bg-teal-50 px-4 py-1.5 text-xs font-bold text-teal-700 ring-1 ring-teal-100 whitespace-nowrap">🧭 Hướng dẫn viên</span> : null}
+                      {Object.values(detailOpen.row.servicesPreference).every((v) => v === false) ? <span className="rounded-full bg-slate-50 px-4 py-1.5 text-xs font-bold text-slate-600 ring-1 ring-slate-100 whitespace-nowrap">📍 Không có yêu cầu dịch vụ cụ thể</span> : null}
+                    </div>
+                    {detailOpen.row.transportRequestedNotes ? <div className="text-sm text-slate-600 italic border-l-2 border-amber-300 pl-3 bg-amber-50/40 py-2 pr-3 rounded-r-xl">🚍 {detailOpen.row.transportRequestedNotes}</div> : null}
+                    {detailOpen.row.specialRequirements ? <div className="text-sm text-slate-700 italic border-l-2 border-indigo-300 pl-3 bg-indigo-50/40 py-2 pr-3 rounded-r-xl whitespace-pre-wrap">📝 {detailOpen.row.specialRequirements}</div> : null}
+                    {detailOpen.row.internalStaffNote ? <div className="text-sm text-slate-700 border-l-2 border-orange-400 pl-3 bg-orange-50/50 py-2 pr-3 rounded-r-xl whitespace-pre-wrap font-semibold">📝 (Nội bộ) {detailOpen.row.internalStaffNote}</div> : null}
+                  </div>
+                  {detailOpen.row.convertedBookingId ? (
+                    <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-wide text-emerald-600">✅ Đã chuyển đổi thành Booking</div>
+                          <div className="mt-1 text-lg font-black text-emerald-800 font-mono">{detailOpen.row.convertedBookingId}</div>
+                        </div>
+                        <span className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-black uppercase text-white">🏆 WON</span>
+                      </div>
+                    </div>
+                  ) : (detailOpen.row.status === 'won' || detailOpen.row.status === 'converted_booking') ? (
+                    <div className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-5 shadow-sm">
+                      <div className="text-xs font-black uppercase tracking-wide text-orange-700">⏳ Chờ chuyển đổi Booking</div>
+                      <div className="mt-1 text-sm text-slate-600">Admin sẽ tự động tạo Booking cho Tour đoàn này trong 15 phút. Nếu chậm hơn vui lòng liên hệ Admin.</div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <GtrTodosChecklist gtrId={detailOpen.row._id} role="staff" />
+              )}
             </div>
           </div>
         </div>

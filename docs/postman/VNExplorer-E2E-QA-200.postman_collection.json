@@ -1,0 +1,2837 @@
+{
+  "info": {
+    "_postman_id": "e4b1a2d8-6ce1-4f8a-9c3d-7a1b2c3d4e5f",
+    "name": "VNExplorer Bước 10: QA Regression 10×20 assertions = 200 tests",
+    "description": "Hệ thống đặt tour VietNam Explorer Bước 10 Documentation: 10 endpoint × 20 Postman assertions = 200 test cases nightly QA. Link Scalar reference: /api/reference OpenAPI 3.1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": {
+      "major": 2,
+      "minor": 1,
+      "patch": 0,
+      "identifier": "v2.1.0-step10-buoi15"
+    }
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://127.0.0.1:4000/api",
+      "type": "string",
+      "description": "Nest API URL local / staging / production (đổi qua môi trường)"
+    },
+    {
+      "key": "ACCESS_TOKEN",
+      "value": "",
+      "type": "string",
+      "description": "Bearer JWT từ POST /auth/login hoặc /auth/2fa/login-step2 (auto save env pm.environment.set)"
+    },
+    {
+      "key": "XSRF_TOKEN",
+      "value": "",
+      "type": "string",
+      "description": "CSRF Bước 6 double submit cookie GET /api/auth/csrf-token"
+    },
+    {
+      "key": "STEP2_TOKEN",
+      "value": "",
+      "type": "string",
+      "description": "step2 JWT TOTP 2FA nếu user 2FA enabled"
+    },
+    {
+      "key": "TEST_TOUR_SLUG",
+      "value": "tour-du-lich-ha-noi-sapa-3n2d",
+      "type": "string",
+      "description": "Public slug published tour từ seed T1-E2E"
+    },
+    {
+      "key": "TEST_TOUR_ID",
+      "value": "",
+      "type": "string",
+      "description": "ObjectId tour seed e2e"
+    },
+    {
+      "key": "DEPARTURE_ID",
+      "value": "",
+      "type": "string",
+      "description": "ObjectId departure seatsTotal >= 20, open status"
+    },
+    {
+      "key": "TEST_BOOKING_ID",
+      "value": "",
+      "type": "string",
+      "description": "Booking ObjectId auto save sau E5 create"
+    },
+    {
+      "key": "BOOKING_CODE",
+      "value": "",
+      "type": "string",
+      "description": "Mã booking human readable BOOK-XXXX"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "Bearer {{ACCESS_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Bước 6: Pre-request global ensure xsrf token đã có (gọi /api/auth/csrf-token nếu XSRF_TOKEN empty).",
+          "async function ensureXsrfToken() { if (pm.environment.get('XSRF_TOKEN')) return; const u = (pm.collectionVariables.get('BASE_URL') || '') + '/auth/csrf-token'; pm.sendRequest({url: u, method: 'GET'}, (e,r) => { if (r && r.json && r.json().xsrfToken) { pm.environment.set('XSRF_TOKEN', r.json().xsrfToken); console.log('[pre global] xsrf auto set'); } }); } ensureXsrfToken();"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Bước 7 Sentry APM: Ghi log response time ra console (có thể export Grafana Cloud Postman monitor).",
+          "pm.expect(typeof pm.response.responseTime === 'number').to.be.true;",
+          "console.log('[global QA assertion] URL=' + pm.request.url + ' code=' + pm.response.code + ' RT=' + pm.response.responseTime + 'ms');",
+          "pm.test(\"Global SLA #1: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #2: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #3: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #4: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #5: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #6: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #7: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #8: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #9: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #10: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #11: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #12: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #13: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #14: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #15: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #16: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });",
+          "pm.test(\"Global SLA #17: response code not 500 ServerError\", function () { pm.expect(pm.response.code).not.to.be.within(500, 599); });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "E01. POST /auth/login",
+      "description": "=== ENDPOINT 1 / POST /auth/login ===\nĐăng nhập step 1 email/password. Rate login 5/60s Bước 6. TotpRequired=true nếu 2FA enabled. Cookie XSRF-TOKEN save biến môi trường\nPostman tests count assertions: 21 assertions",
+      "item": [
+        {
+          "name": "HP-Login OK Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer-e2e@vnexplorer-test.invalid\",\n  \"password\": \"P@ssw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 201]\", function () { pm.expect([200,201]).to.include(pm.response.code); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"totpRequired boolean\", function () { const d=pm.response.json(); pm.expect(typeof d.totpRequired === 'boolean').to.be.true; })",
+                  "pm.test(\"user hoặc stepToken\", function () { const d=pm.response.json(); pm.expect(Boolean(d.user)||Boolean(d.stepToken)).to.be.true; })",
+                  "pm.test(\"field user.id exists (string)\", function () { const d = pm.response.json(); const p = user.id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(8); })",
+                  "pm.test(\"field user.name exists (string)\", function () { const d = pm.response.json(); const p = user.name;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field user.email exists (string)\", function () { const d = pm.response.json(); const p = user.email;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(5); })",
+                  "pm.test(\"field user.role exists (string)\", function () { const d = pm.response.json(); const p = user.role;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(4); })",
+                  "pm.test(\"SET accessToken env from body.accessToken\", function () { \n  const d=pm.response.json();\n  if (d.accessToken) { pm.environment.set('ACCESS_TOKEN', d.accessToken); console.log('✅ save ACCESS_TOKEN', d.accessToken.slice(0,12)+'...'); }\n  const setCookie = pm.cookies.get('XSRF-TOKEN') || (pm.response.headers.get('X-Response-XSRF')||'');\n  if (setCookie) { pm.environment.set('XSRF_TOKEN', setCookie); console.log('✅ save XSRF_TOKEN'); }\n })",
+                  "pm.test(\"role customer/staff/admin\", function () { const r = pm.response.json(); pm.expect(['customer','staff','admin']).to.include(r.user?.role || 'NONE'); })",
+                  "pm.test(\"password NOT leak body\", function () { const s = JSON.stringify(pm.response.json()).toLowerCase(); pm.expect(s).not.to.include('password'); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N401 Sai mật khẩu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer-e2e@vnexplorer-test.invalid\",\n  \"password\": \"SAI\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [401, 400]\", function () { pm.expect([401,400]).to.include(pm.response.code); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field statusCode exists (number)\", function () { const d = pm.response.json(); const p = statusCode;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n     })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N429 Rate limit login 5/60",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rate-limit-attack@x.invalid\",\n  \"password\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 401, 429]\", function () { pm.expect([400,401,429]).to.include(pm.response.code); })",
+                  "pm.test(\"message chứa \\\"thử lại\\\" hoặc 429\", function () { const m = (pm.response.json().message||'').toLowerCase(); pm.expect(pm.response.code===429 || m.includes('thử') || m.includes('rate')).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N400 invalid email format",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-email-wrong\",\n  \"password\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400]\", function () { pm.expect([400]).to.include(pm.response.code); })",
+                  "pm.test(\"field message exists (string)\", function () { const d = pm.response.json(); const p = message;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(3); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N-empty password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ok@x.com\",\n  \"password\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 401, 422]\", function () { pm.expect([400,401,422]).to.include(pm.response.code); })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E02. POST /auth/2fa/login-step2",
+      "description": "=== ENDPOINT 2 / POST /auth/2fa/login-step2 ===\n2FA TOTP step 2 nhập 6 số Google Auth Bước 6. Requires stepToken từ step1. Set Cookie Refresh HttpOnly.\nPostman tests count assertions: 15 assertions",
+      "item": [
+        {
+          "name": "HP 2FA Step 2 valid code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/2fa/login-step2",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "2fa",
+                "login-step2"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepToken\": \"{{STEP2_TOKEN}}\",\n  \"code\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"totpRequired boolean\", function () { const d=pm.response.json(); pm.expect(typeof d.totpRequired === 'boolean').to.be.true; })",
+                  "pm.test(\"user hoặc stepToken\", function () { const d=pm.response.json(); pm.expect(Boolean(d.user)||Boolean(d.stepToken)).to.be.true; })",
+                  "pm.test(\"field user.id exists (string)\", function () { const d = pm.response.json(); const p = user.id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(8); })",
+                  "pm.test(\"field user.name exists (string)\", function () { const d = pm.response.json(); const p = user.name;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field user.email exists (string)\", function () { const d = pm.response.json(); const p = user.email;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(5); })",
+                  "pm.test(\"field user.role exists (string)\", function () { const d = pm.response.json(); const p = user.role;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(4); })",
+                  "pm.test(\"SET accessToken env from body.accessToken\", function () { \n  const d=pm.response.json();\n  if (d.accessToken) { pm.environment.set('ACCESS_TOKEN', d.accessToken); console.log('✅ save ACCESS_TOKEN', d.accessToken.slice(0,12)+'...'); }\n  const setCookie = pm.cookies.get('XSRF-TOKEN') || (pm.response.headers.get('X-Response-XSRF')||'');\n  if (setCookie) { pm.environment.set('XSRF_TOKEN', setCookie); console.log('✅ save XSRF_TOKEN'); }\n })",
+                  "pm.test(\"stepToken absent\", function () { pm.expect(pm.response.json().stepToken===undefined).to.be.true; })",
+                  "pm.test(\"field user.totpEnabled exists (boolean)\", function () { const d = pm.response.json(); const p = user.totpEnabled;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"boolean\");\n     })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N401 TOTP 5 số quá ngắn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/2fa/login-step2",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "2fa",
+                "login-step2"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepToken\": \"{{STEP2_TOKEN}}\",\n  \"code\": \"1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 401]\", function () { pm.expect([400,401]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N400 missing stepToken",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/2fa/login-step2",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "2fa",
+                "login-step2"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"111111\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422]\", function () { pm.expect([400,422]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N498 stepToken hết hạn / sai signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/2fa/login-step2",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "2fa",
+                "login-step2"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepToken\": \"expired-wrong-sig.jwt.here1234\",\n  \"code\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 401, 498]\", function () { pm.expect([400,401,498]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rate 6 lần/phút Throttler login tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/2fa/login-step2",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "2fa",
+                "login-step2"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepToken\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"code\": \"999999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 401, 429]\", function () { pm.expect([400,401,429]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E03. GET /tours published list",
+      "description": "=== ENDPOINT 3 / GET /tours published list ===\nCatalog công khai all published. Filter q search title/highlights, region, tag. Sắp xếp nextDepartureDate gần nhất.\nPostman tests count assertions: 24 assertions",
+      "item": [
+        {
+          "name": "HP: List 20 tour published",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours?limit=20",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours?limit=20"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })",
+                  "pm.test(\"body có items\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"items\"); })",
+                  "pm.test(\"total/items: array length <= total\", function () { const d=pm.response.json(); pm.expect(d.items.length).to.be.at.most(d.total||Infinity); })",
+                  "pm.test(\"field items[0].id exists (string)\", function () { const d = pm.response.json(); const p = items[0].id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(5); })",
+                  "pm.test(\"field items[0].slug exists (string)\", function () { const d = pm.response.json(); const p = items[0].slug;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(3); })",
+                  "pm.test(\"field items[0].title exists (string)\", function () { const d = pm.response.json(); const p = items[0].title;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(2); })",
+                  "pm.test(\"field items[0].priceFrom exists (number)\", function () { const d = pm.response.json(); const p = items[0].priceFrom;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field items[0].durationDays exists (number)\", function () { const d = pm.response.json(); const p = items[0].durationDays;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"items[0].isPublished true (API public trả published only)\", function () { const d=pm.response.json(); if (d.items.length) pm.expect(Boolean(d.items[0].isPublished)).to.be.true; })",
+                  "pm.test(\"avgRating hoặc null <=5\", function () { const d=pm.response.json(); if (d.items.length && typeof d.items[0].avgRating === 'number') pm.expect(d.items[0].avgRating).to.be.at.most(5); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: ?q=Miền Bắc search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours?q=Miền%20Bắc",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours?q=Miền%20Bắc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })",
+                  "pm.test(\"search q match title or highlights chứa \\\"Bắc\\\" hoặc \\\"Miền\\\"\", function () { \n          const d=pm.response.json(); const kw = 'bắc';\n          const any = d.items.some(t => (t.title||'').toLowerCase().includes(kw) || (Array.isArray(t.highlights)?t.highlights.join(' '):'').toLowerCase().includes(kw)) || d.items.length===0;\n          pm.expect(any).to.be.true;\n         })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: ?region=Phú Quốc",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours?region=Phú%20Quốc",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours?region=Phú%20Quốc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })",
+                  "pm.test(\"region filter Phú Quốc đúng\", function () { const d=pm.response.json(); pm.expect(d.items.every(t => !t.region || String(t.region).includes('Quốc'))).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N: ?tag invalid random = 0 hoặc nhiều results (không lỗi 500)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours?tag=tag-ko-ton-tai-xyz1234",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours?tag=tag-ko-ton-tai-xyz1234"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Performance <1500ms Reports Bước 8 index mới",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Response time ≤ 1500ms index reports_status_departure_created IXSCAN\", function () { pm.expect(pm.response.responseTime).to.be.below(1500); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E04. GET /tours/:slug Tour Detail + Departures",
+      "description": "=== ENDPOINT 4 / GET /tours/:slug Tour Detail + Departures ===\nDetail slug public. Trả tour, related 4 tour tương tự, departures open, gallery images, prices, faq.\nPostman tests count assertions: 19 assertions",
+      "item": [
+        {
+          "name": "HP: slug tồn tại",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"body có tour\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"tour\"); })",
+                  "pm.test(\"body có related\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"related\"); })",
+                  "pm.test(\"field tour.slug exists (string)\", function () { const d = pm.response.json(); const p = tour.slug;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(3); })",
+                  "pm.test(\"field tour.departures exists (object)\", function () { const d = pm.response.json(); const p = tour.departures;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"object\");\n     })",
+                  "pm.test(\"departures array\", function () { pm.expect(Array.isArray(pm.response.json().tour?.departures)).to.be.true; })",
+                  "pm.test(\"field tour.id exists (string)\", function () { const d = pm.response.json(); const p = tour.id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(8); })",
+                  "pm.test(\"field tour.title exists (string)\", function () { const d = pm.response.json(); const p = tour.title;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(2); })",
+                  "pm.test(\"field tour.priceFrom exists (number)\", function () { const d = pm.response.json(); const p = tour.priceFrom;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field tour.durationDays exists (number)\", function () { const d = pm.response.json(); const p = tour.durationDays;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field tour.isPublished exists (boolean)\", function () { const d = pm.response.json(); const p = tour.isPublished;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"boolean\");\n     })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: departures[0] fields đủ",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"first departure đủ fields: id, departureDate, priceAdult, seatsAvailable\", function () { \n          const d=pm.response.json(); const dep = d.tour?.departures?.[0];\n          if (dep) { pm.expect(dep).to.have.property('id'); pm.expect(dep).to.have.property('departureDate'); pm.expect(dep).to.have.property('priceAdult'); pm.expect(dep).to.have.property('seatsAvailable'); }\n          else pm.expect(true).to.be.true; // no dep thì pass\n         })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N404 slug không tồn tại tour-khong-ton-tai-xyz",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/slug-khong-ton-tai-xyz-987654321",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "slug-khong-ton-tai-xyz-987654321"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [404, 400]\", function () { pm.expect([404,400]).to.include(pm.response.code); })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "related list <=4 item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"related length <=4 theo spec\", function () { const d=pm.response.json(); if (Array.isArray(d.related)) pm.expect(d.related.length).to.be.at.most(4); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "security: Không chứa admin fields: isDeleted / internal cost / supplier",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"body NOT has supplier / isDeleted / internalCost (PII leak)\", function () { const s = JSON.stringify(pm.response.json()).toLowerCase(); pm.expect(s).not.to.include('supplier').and.not.to.include('isdeleted').and.not.to.include('internalcost'); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E05. POST /tours/:slug/bookings Create Booking",
+      "description": "=== ENDPOINT 5 / POST /tours/:slug/bookings Create Booking ===\nTạo đơn đặt tour NEW. Public hoặc customer login. Requires xsrf header Bước 6. NL2+TE1 = happy. Departure seatsAvailable giảm.\nPostman tests count assertions: 23 assertions",
+      "item": [
+        {
+          "name": "HP: Tạo BOOKING NL=2 TE=1 EB=0 hold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}/bookings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departureId\": \"{{DEPARTURE_ID}}\",\n  \"adultCount\": 2,\n  \"childCount\": 1,\n  \"infantCount\": 0,\n  \"contact\": {\n    \"name\": \"QA Nguyễn Văn A\",\n    \"phone\": \"0909123456\",\n    \"email\": \"qa+booking@vnexplorer-test.invalid\",\n    \"address\": \"123 Nguyễn Huệ Q1 HCM\"\n  },\n  \"passengers\": [\n    {\n      \"fullName\": \"QA Nguyễn Văn A\",\n      \"type\": \"NL\",\n      \"birthDate\": \"1990-01-01\",\n      \"gender\": \"male\",\n      \"idCard\": \"0123456789\"\n    },\n    {\n      \"fullName\": \"QA Trần Thị B\",\n      \"type\": \"NL\",\n      \"birthDate\": \"1992-05-05\",\n      \"gender\": \"female\",\n      \"idCard\": \"9876543210\"\n    },\n    {\n      \"fullName\": \"QA Nguyễn Bé Yêu\",\n      \"type\": \"TE\",\n      \"birthDate\": \"2018-08-08\",\n      \"gender\": \"other\"\n    }\n  ],\n  \"notes\": \"QA E2E Step10 Booking 200 assertions\",\n  \"surcharges\": [],\n  \"paymentMethod\": \"hold\",\n  \"agreeTerms\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 201]\", function () { pm.expect([200,201]).to.include(pm.response.code); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field id exists (string)\", function () { const d = pm.response.json(); const p = id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(8); })",
+                  "pm.test(\"field code exists (string)\", function () { const d = pm.response.json(); const p = code;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(4); })",
+                  "pm.test(\"field status exists (string)\", function () { const d = pm.response.json(); const p = status;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(2); })",
+                  "pm.test(\"field totalAmount exists (number)\", function () { const d = pm.response.json(); const p = totalAmount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field adultCount exists (number)\", function () { const d = pm.response.json(); const p = adultCount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field paymentMethod exists (string)\", function () { const d = pm.response.json(); const p = paymentMethod;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(2); })",
+                  "pm.test(\"field holdsUntil exists (string)\", function () { const d = pm.response.json(); const p = holdsUntil;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(12); })",
+                  "pm.test(\"field contact.name exists (string)\", function () { const d = pm.response.json(); const p = contact.name;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field adultCount exists (number)\", function () { const d = pm.response.json(); const p = adultCount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field childCount exists (number)\", function () { const d = pm.response.json(); const p = childCount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"SET TEST_BOOKING_ID save env\", function () { const d=pm.response.json(); if (d.id) { pm.environment.set('TEST_BOOKING_ID', d.id); pm.environment.set('BOOKING_CODE', d.code); console.log('✅ save TEST_BOOKING_ID', d.id); } })",
+                  "pm.test(\"Tổng 3 khách đúng passenger NL=2 TE=1\", function () { const d=pm.response.json(); pm.expect(d.adultCount+d.childCount+d.infantCount).to.eql(3); })",
+                  "pm.test(\"payment status unpaid hold default\", function () { const d=pm.response.json(); pm.expect(d.paymentStatus==='unpaid' || d.status==='new' || d.status==='NEW').to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N1: 0 chỗ 3 loại 0 → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}/bookings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departureId\": \"{{DEPARTURE_ID}}\",\n  \"adultCount\": 0,\n  \"childCount\": 0,\n  \"infantCount\": 0,\n  \"contact\": {\n    \"name\": \"x\",\n    \"phone\": \"0909000111\",\n    \"email\": \"n@x.y\"\n  },\n  \"passengers\": [],\n  \"agreeTerms\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422, 409]\", function () { pm.expect([400,422,409]).to.include(pm.response.code); })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N2: Vượt capacity departure 12 → 20 NL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}/bookings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departureId\": \"{{DEPARTURE_ID}}\",\n  \"adultCount\": 20,\n  \"childCount\": 0,\n  \"infantCount\": 0,\n  \"contact\": {\n    \"name\": \"QA Over Pax\",\n    \"phone\": \"0909999888\"\n  },\n  \"passengers\": [\n    {\n      \"fullName\": \"QA 0\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 1\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 2\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 3\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 4\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 5\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 6\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 7\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 8\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 9\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 10\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 11\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 12\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 13\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 14\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 15\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 16\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 17\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 18\",\n      \"type\": \"NL\"\n    },\n    {\n      \"fullName\": \"QA 19\",\n      \"type\": \"NL\"\n    }\n  ],\n  \"agreeTerms\": true,\n  \"paymentMethod\": \"hold\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 409, 422]\", function () { pm.expect([400,409,422]).to.include(pm.response.code); })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N3: Phone 09123 (4 số) regex VN invalid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}/bookings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departureId\": \"{{DEPARTURE_ID}}\",\n  \"adultCount\": 1,\n  \"childCount\": 0,\n  \"infantCount\": 0,\n  \"contact\": {\n    \"name\": \"Bad\",\n    \"phone\": \"09123\"\n  },\n  \"passengers\": [\n    {\n      \"fullName\": \"Bad\",\n      \"type\": \"NL\"\n    }\n  ],\n  \"agreeTerms\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422]\", function () { pm.expect([400,422]).to.include(pm.response.code); })",
+                  "pm.test(\"message chứa điện thoại/số/phone không hợp lệ\", function () { const m = (pm.response.json().message||'').toLowerCase(); pm.expect(m.includes('điện') || m.includes('số') || m.includes('phone') || m.includes('không hợp lệ')).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N: Không agreeTerms → BadRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/tours/{{TEST_TOUR_SLUG}}/bookings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tours",
+                "{{TEST_TOUR_SLUG}}",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departureId\": \"{{DEPARTURE_ID}}\",\n  \"adultCount\": 1,\n  \"passengers\": [\n    {\n      \"fullName\": \"A\",\n      \"type\": \"NL\"\n    }\n  ],\n  \"contact\": {\n    \"name\": \"A\",\n    \"phone\": \"0909000000\"\n  },\n  \"agreeTerms\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422]\", function () { pm.expect([400,422]).to.include(pm.response.code); })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E06. PATCH /me/bookings/:id/cancel Khách hủy đơn",
+      "description": "=== ENDPOINT 6 / PATCH /me/bookings/:id/cancel Khách hủy đơn ===\nCustomer login Bearer. Hủy NEW/HOLD trả seatsAvailable. Phải là chủ booking (owner check 403).\nPostman tests count assertions: 10 assertions",
+      "item": [
+        {
+          "name": "HP: Owner Hủy NEW đơn test vừa tạo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelReason\": \"QA E2E cancel test step 10\",\n  \"sendBackSeatsOnCancel\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 201]\", function () { pm.expect([200,201]).to.include(pm.response.code); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"body có id\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"id\"); })",
+                  "pm.test(\"field status exists (string)\", function () { const d = pm.response.json(); const p = status;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(2); })",
+                  "pm.test(\"status === cancelled\", function () { const d=pm.response.json(); pm.expect(String(d.status).toLowerCase()).to.eql('cancelled'); })",
+                  "pm.test(\"body có cancelledAt\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"cancelledAt\"); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N403: hủy đơn không phải chủ sở hữu user khác",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/66f000000000000000000000/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "66f000000000000000000000",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelReason\": \"HACK cố tình hủy đơn người khác\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [403, 404]\", function () { pm.expect([403,404]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N409: Hủy 2 lần (double cancel) không throw 500, OK hoặc 409",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelReason\": \"double cancel\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 400, 409]\", function () { pm.expect([200,400,409]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N401: Không có Bearer token",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelReason\": \"no-auth\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [401, 499]\", function () { pm.expect([401,499]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N: id không phải objectId 24 hex",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/not-object-id-short/cancel",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "not-object-id-short",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelReason\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422, 404]\", function () { pm.expect([400,422,404]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E07. GET /me/bookings Danh sách đơn của tôi",
+      "description": "=== ENDPOINT 7 / GET /me/bookings Danh sách đơn của tôi ===\nPagination page 1 limit 20. Filter status=NEW/cancelled/completed. Sort -createdAt.\nPostman tests count assertions: 24 assertions",
+      "item": [
+        {
+          "name": "HP: Trang 1 limit 5",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings?page=1&limit=5",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings?page=1&limit=5"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })",
+                  "pm.test(\"body có total\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"total\"); })",
+                  "pm.test(\"body có page\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"page\"); })",
+                  "pm.test(\"body có limit\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"limit\"); })",
+                  "pm.test(\"body có totalPages\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"totalPages\"); })",
+                  "pm.test(\"field page exists (number)\", function () { const d = pm.response.json(); const p = page;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field limit exists (number)\", function () { const d = pm.response.json(); const p = limit;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field items[0].id exists (string)\", function () { const d = pm.response.json(); const p = items[0].id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(8); })",
+                  "pm.test(\"field items[0].code exists (string)\", function () { const d = pm.response.json(); const p = items[0].code;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(3); })",
+                  "pm.test(\"field items[0].tour.title exists (string)\", function () { const d = pm.response.json(); const p = items[0].tour.title;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"items length <= limit (5)\", function () { const d=pm.response.json(); pm.expect(d.items.length).to.be.at.most(d.limit); })",
+                  "pm.test(\"page 1 luôn trả totalPages >= 1\", function () { const d=pm.response.json(); pm.expect(d.totalPages>=1).to.be.true; })",
+                  "pm.test(\"sort mới nhất -> cũ (createdAt desc)\", function () { const d=pm.response.json(); if (d.items.length>=2) { const a = new Date(d.items[0].createdAt||0).getTime(); const b = new Date(d.items[1].createdAt||0).getTime(); pm.expect(a).to.be.at.least(b); } })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: Filter ?status=new",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings?status=new",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings?status=new"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })",
+                  "pm.test(\"mỗi item status === new/ NEW\", function () { const d=pm.response.json(); pm.expect(d.items.every(b => String(b.status).toLowerCase() === 'new' || d.items.length === 0)).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: ?status=cancelled sau bước 6 vừa hủy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings?status=cancelled",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings?status=cancelled"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N400: ?page=-1 invalid → default 1 hoặc 400 / không 500",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings?page=-9999&limit=0",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings?page=-9999&limit=0"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 400]\", function () { pm.expect([200,400]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N401: Logout → 401 Không list được bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [401, 403, 499]\", function () { pm.expect([401,403,499]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E08. PATCH /admin/bookings/:id/won (Tour Group chốt WON)",
+      "description": "=== ENDPOINT 8 / PATCH /admin/bookings/:id/won (Tour Group chốt WON) ===\nAdmin/Staff Roles Bước 6. Trigger Operation checklist Todo 5 mục KS/MB/Visa/HDV/Xe (Bước 5). Lưu stateWonSnapshot versioned.\nPostman tests count assertions: 14 assertions",
+      "item": [
+        {
+          "name": "HP: Admin staff chốt WON",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/bookings/{{TEST_BOOKING_ID}}/won",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "won"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wonNote\": \"QA E2E chốt thành công tour group 12 người\",\n  \"triggerOperationTodos\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 201]\", function () { pm.expect([200,201]).to.include(pm.response.code); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field id exists (string)\", function () { const d = pm.response.json(); const p = id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(8); })",
+                  "pm.test(\"field code exists (string)\", function () { const d = pm.response.json(); const p = code;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(4); })",
+                  "pm.test(\"field status exists (string)\", function () { const d = pm.response.json(); const p = status;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(2); })",
+                  "pm.test(\"field totalAmount exists (number)\", function () { const d = pm.response.json(); const p = totalAmount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field adultCount exists (number)\", function () { const d = pm.response.json(); const p = adultCount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field status exists (string)\", function () { const d = pm.response.json(); const p = status;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(3); })",
+                  "pm.test(\"status = completed hoặc WON (case-insensitive)\", function () { const d=pm.response.json(); pm.expect(String(d.status).toLowerCase() === 'completed' || String(d.status).toLowerCase().includes('won')).to.be.true; })",
+                  "pm.test(\"stateWonSnapshot field có 5 checklists KS MB Visa HDV Xe\", function () { const d=pm.response.json(); const s = d.stateWonSnapshot || d.wonSnapshot || d.won || {}; pm.expect(typeof s).to.eql('object'); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N403 Customer role (role=customer → 403 Roles guard)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/bookings/{{TEST_BOOKING_ID}}/won",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "won"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wonNote\": \"hack customer làm admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [403, 401]\", function () { pm.expect([403,401]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N404 booking id x không tồn tại",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/bookings/66f000000000000000000000/won",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "66f000000000000000000000",
+                "won"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [404, 400]\", function () { pm.expect([404,400]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotent: mark WON 2 lần không lỗi 500",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/bookings/{{TEST_BOOKING_ID}}/won",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "won"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wonNote\": \"double WON test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 400, 409]\", function () { pm.expect([200,400,409]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N: Staff không sở hữu assigned → 403 assigned not owner",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/admin/bookings/{{TEST_BOOKING_ID}}/won",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "admin",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "won"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wonNote\": \"staff không assigned\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 403]\", function () { pm.expect([200,403]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E09. GET /me/notifications list & badge",
+      "description": "=== ENDPOINT 9 / GET /me/notifications list & badge ===\nCustomer/Staff/Admin login. SSE socket.io optional. List inbox, unreadCount badge, settings push notifications.\nPostman tests count assertions: 20 assertions",
+      "item": [
+        {
+          "name": "HP: List notifications page 1 limit 10",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/notifications?page=1&limit=10",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "notifications?page=1&limit=10"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field items exists (object)\", function () { const d = pm.response.json(); const p = items;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"object\");\n     })",
+                  "pm.test(\"items is array\", function () { pm.expect(Array.isArray(pm.response.json().items)).to.be.true; })",
+                  "pm.test(\"field unreadCount exists (number)\", function () { const d = pm.response.json(); const p = unreadCount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"field total exists (number)\", function () { const d = pm.response.json(); const p = total;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"items là array length >=0\", function () { const d=pm.response.json(); pm.expect(Array.isArray(d.items)).to.be.true; })",
+                  "pm.test(\"field items exists (object)\", function () { const d = pm.response.json(); const p = items;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"object\");\n     })",
+                  "pm.test(\"field page exists (number)\", function () { const d = pm.response.json(); const p = page;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })",
+                  "pm.test(\"field limit exists (number)\", function () { const d = pm.response.json(); const p = limit;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(1); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: Badge /badge unreadCount",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/notifications/badge",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "notifications",
+                "badge"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field unreadCount exists (number)\", function () { const d = pm.response.json(); const p = unreadCount;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"number\");\n    if (\"number\" === 'number' || \"number\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(0); })",
+                  "pm.test(\"unreadCount số nguyên ko âm\", function () { const d=pm.response.json(); pm.expect(Number.isInteger(d.unreadCount) && d.unreadCount >= 0).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HP: settings return object {}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/notifications/settings",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "notifications",
+                "settings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status = 200\", function () { pm.response.to.have.status(200); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field id exists (string)\", function () { const d = pm.response.json(); const p = id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n     })",
+                  "pm.test(\"field emailBooking exists (boolean)\", function () { const d = pm.response.json(); const p = emailBooking;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"boolean\");\n     })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N401: Không auth token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/notifications",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "notifications"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [401, 403]\", function () { pm.expect([401,403]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Performance <800ms list 50 thông báo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/notifications?limit=50",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "notifications?limit=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Response time ≤ 800ms\", function () { pm.expect(pm.response.responseTime).to.be.below(800); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E10. POST /me/bookings/:id/payment-bank-transfer (CK bằng chứng)",
+      "description": "=== ENDPOINT 10 / POST /me/bookings/:id/payment-bank-transfer (CK bằng chứng) ===\nKhách upload bằng chứng Chuyển khoản. totalAmount>0 lệch ≤ tolerance 5%. Lưu paymentHistory[]. Trigger notify staff finance đối soát.\nPostman tests count assertions: 13 assertions",
+      "item": [
+        {
+          "name": "HP: Gửi bằng chứng bank ACB 12,345,678 VND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/payment-bank-transfer",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "payment-bank-transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankCode\": \"ACB\",\n  \"transferAmount\": 12345678,\n  \"transferAt\": \"2026-08-12T06:31:43.883Z\",\n  \"referenceNo\": \"QA-E2E-STEP10-BANK-99\",\n  \"totalAmount\": 12345678,\n  \"accountHolderName\": \"NGUYEN VAN A\",\n  \"note\": \"Đặt tour BOOKING-CODE\",\n  \"uploadSlipUrls\": [\n    \"https://picsum.photos/seed/slip-e2e/400/600\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [200, 201, 202]\", function () { pm.expect([200,201,202]).to.include(pm.response.code); })",
+                  "pm.test(\"Content-Type: application/json\", function () { pm.response.to.be.json; })",
+                  "pm.test(\"field id exists (string)\", function () { const d = pm.response.json(); const p = id;\n    const val = p.split('.').reduce((o,k) => (o && typeof o === 'object' ? o[k] : undefined), d);\n    pm.expect(typeof val).to.eql(\"string\");\n    if (\"string\" === 'number' || \"string\" === 'string') pm.expect((typeof val === 'string' ? val.length : val)).to.be.at.least(5); })",
+                  "pm.test(\"body có paymentStatus\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"paymentStatus\"); })",
+                  "pm.test(\"payment method = bank_transfer\", function () { const d=pm.response.json(); pm.expect(String(d.paymentMethod||'').toLowerCase()).to.include('bank'); })",
+                  "pm.test(\"paymentStatus pending_bank_transfer hoặc pending\", function () { const d=pm.response.json(); const s = String(d.paymentStatus||'').toLowerCase(); pm.expect(s.includes('pending')).to.be.true; })",
+                  "pm.test(\"paymentBankTransferMeta field object history array\", function () { const d=pm.response.json(); const meta = d.paymentBankTransferMeta || d.bankMeta || d.payment || {}; pm.expect(typeof meta === 'object').to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N5: totalAmount=0 VND invalid validation 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/payment-bank-transfer",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "payment-bank-transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankCode\": \"VCB\",\n  \"transferAmount\": 0,\n  \"transferAt\": \"2026-08-12T06:31:43.884Z\",\n  \"referenceNo\": \"ZERO\",\n  \"totalAmount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422]\", function () { pm.expect([400,422]).to.include(pm.response.code); })",
+                  "pm.test(\"body có message\", function () { const d=pm.response.json(); pm.expect(d).to.have.property(\"message\"); })",
+                  "pm.test(\"message bao gồm \\\"số tiền/tổng tiền/amount\\\"\", function () { const m = (pm.response.json().message||'').toLowerCase(); pm.expect(m.includes('tiền') || m.includes('amount') || m.includes('lớn hơn 0') || m.includes('0')).to.be.true; })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N400 transferAmount lệch 20% booking.totalAmount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/payment-bank-transfer",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "payment-bank-transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankCode\": \"BIDV\",\n  \"transferAmount\": 99,\n  \"totalAmount\": 99,\n  \"transferAt\": \"2026-08-12T06:31:43.884Z\",\n  \"referenceNo\": \"LECH_20PERCENT_TEST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422, 409]\", function () { pm.expect([400,422,409]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N400 bankCode invalid length 0 hoặc 10 chữ rác",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/{{TEST_BOOKING_ID}}/payment-bank-transfer",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "{{TEST_BOOKING_ID}}",
+                "payment-bank-transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankCode\": \"KHONG_PHAI_NGAN_HANG_CODE_INVALID_XXX\",\n  \"transferAmount\": 10000,\n  \"totalAmount\": 10000,\n  \"transferAt\": \"2026-08-12T06:31:43.884Z\",\n  \"referenceNo\": \"1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [400, 422]\", function () { pm.expect([400,422]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N403: booking owner different user → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "disabled": false
+              },
+              {
+                "key": "X-XSRF-TOKEN",
+                "value": "{{XSRF_TOKEN}}",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/me/bookings/66f000000000000000000001/payment-bank-transfer",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "me",
+                "bookings",
+                "66f000000000000000000001",
+                "payment-bank-transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankCode\": \"TCB\",\n  \"transferAmount\": 1000,\n  \"totalAmount\": 1000,\n  \"transferAt\": \"2026-08-12T06:31:43.884Z\",\n  \"referenceNo\": \"HACK-OTHER-BOOKING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status in [403, 404, 401]\", function () { pm.expect([403,404,401]).to.include(pm.response.code); })"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

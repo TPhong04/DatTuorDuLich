@@ -78,7 +78,7 @@ export default function AccountPage() {
         </div>
       ) : null}
 
-      <PageHeader subtitle="Quản lý thông tin cá nhân, booking và hóa đơn." title="Tài khoản" />
+      <PageHeader title="Tài khoản" />
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">

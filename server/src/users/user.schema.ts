@@ -70,6 +70,15 @@ export class User {
 
   @Prop({ type: Date, default: null })
   passwordResetAt!: Date | null
+
+  @Prop({ type: Boolean, required: true, default: false })
+  totpEnabled!: boolean
+
+  @Prop({ type: String, default: null })
+  totpSecretEncrypted!: string | null
+
+  @Prop({ type: [String], default: [] })
+  totpBackupCodes!: string[]
 }
 
 export const UserSchema = SchemaFactory.createForClass(User)

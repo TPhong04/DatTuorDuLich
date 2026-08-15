@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import PageHeader from '@/components/ui/PageHeader'
+import { DateRangeInput } from '@/components/ui/DateRangeInput'
 import { useToast } from '@/components/notifications/ToastProvider'
 import { BookingStatus, BookingSummary, listMyBookings } from '@/features/bookings/bookings'
 import { PendingBookingReviewRow, REVIEW_STATE_META, fetchMyPendingReviewBookings } from '@/features/reviews/reviews'
@@ -148,8 +149,7 @@ export default function AccountBookingsPage() {
       ) : null}
 
       <PageHeader
-        subtitle="Danh sách các đơn đặt tour bạn đã tạo, bao gồm các đơn giữ chỗ, đã xác nhận và lịch sử."
-        title="Đơn đặt của tôi"
+        title="Đơn đặt tour của tôi"
       />
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
@@ -166,15 +166,19 @@ export default function AccountBookingsPage() {
               <option value="cancelled">Đã hủy</option>
             </select>
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Từ ngày</label>
-            <input type="date" value={fFrom} max={fTo || undefined} onChange={(e) => setFFrom(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
+          <div className="md:col-span-5">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Khoảng ngày đặt</label>
+            <DateRangeInput
+              size="md"
+              variant="customer"
+              from={fFrom || null}
+              to={fTo || null}
+              onChange={(next) => { setFFrom(next.from || ''); setFTo(next.to || '') }}
+              placeholder="Từ ngày"
+              placeholderTo="Đến ngày"
+            />
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Đến ngày</label>
-            <input type="date" value={fTo} min={fFrom || undefined} onChange={(e) => setFTo(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />
-          </div>
-          <div className="md:col-span-5 flex items-end gap-2">
+          <div className="md:col-span-7 flex items-end gap-2">
             <div className="min-w-0 flex-1">
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</label>
               <input value={fQ} onChange={(e) => setFQ(e.target.value)} placeholder="Mã đặt chỗ / Tên tour / SĐT" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4" />

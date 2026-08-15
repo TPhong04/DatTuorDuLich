@@ -1,0 +1,260 @@
+variables:
+  DOCKER_DRIVER: overlay2
+  NODE_VERSION: "22"
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  PLAYWRIGHT_BROWSERS_PATH: "$CI_PROJECT_DIR/.cache/ms-playwright"
+  E2E_BASE_URL: "http://127.0.0.1:5173"
+  E2E_API_URL: "http://127.0.0.1:4000/api"
+
+stages:
+  - deps
+  - build
+  - test
+  - e2e-nightly
+  - notify
+
+# =============================================================================
+# CẤU HÌNH CACHE GITLAB RUNNER (tăng tốc 30-50s/pipeline)
+# =============================================================================
+.default-cache: &default-cache
+  key:
+    files:
+      - package-lock.json
+      - package.json
+      - server/package-lock.json
+      - server/package.json
+  paths:
+    - .npm
+    - node_modules
+    - server/node_modules
+    - .cache/ms-playwright
+  policy: pull
+
+# =============================================================================
+# DEPS: install deps, cache playwright browsers
+# =============================================================================
+deps-install:
+  stage: deps
+  image: node:${NODE_VERSION}-bookworm-slim
+  cache:
+    <<: *default-cache
+    policy: pull-push
+  script:
+    - echo "Install root deps (FE Vite React)"
+    - npm ci --no-audit --no-fund --loglevel=error
+    - echo "Install server deps (NestJS Mongoose)"
+    - cd server && npm ci --no-audit --no-fund --loglevel=error && cd ..
+    - echo "Install Playwright browsers chromium firefox webkit + system deps (libatk libcups libdrm libxkbcommon)"
+    - npx playwright install --with-deps chromium firefox webkit
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "staging" || $CI_COMMIT_TAG'
+      when: on_success
+    - changes:
+        - package.json
+        - package-lock.json
+        - server/package.json
+        - server/package-lock.json
+        - playwright.config.ts
+      when: on_success
+    - when: manual
+      allow_failure: true
+
+# =============================================================================
+# BUILD: FE + BE tsc strict + vite production gzip < 500KB
+# =============================================================================
+build-typescript:
+  stage: build
+  image: node:${NODE_VERSION}-bookworm-slim
+  cache:
+    <<: *default-cache
+  needs: ["deps-install"]
+  script:
+    - echo "1/2 Strict tsc -b (root FE + BE project refs)"
+    - npm run check
+    - echo "2/2 NestJS dist build (server tsc -p tsconfig.json)"
+    - cd server && npm run build && cd ..
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - server/dist
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH'
+      when: on_success
+
+build-vite-production:
+  stage: build
+  image: node:${NODE_VERSION}-bookworm-slim
+  cache:
+    <<: *default-cache
+  needs: ["deps-install", "build-typescript"]
+  script:
+    - echo "FE Vite build production gzip target <= 500KB"
+    - npm run build 2>&1 | tee build.log
+    - echo "Extract gzip size for Slack / Telegram notification"
+    - GZIP_KB=$(grep -E "index.*\.js.*gzip" build.log | tail -n 1 | grep -oE "gzip: +[0-9]+\.[0-9]+ [kK]B" | grep -oE "[0-9]+\.[0-9]+" | head -n 1 || echo "unknown")
+    - echo "FE_GZIP_KB=${GZIP_KB}" >> build.env
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - dist
+      - build.env
+    reports:
+      dotenv: build.env
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH'
+      when: on_success
+    - allow_failure: true
+
+# =============================================================================
+# TEST UNIT: Vitest 30s (BookingSchema / auth service)
+# =============================================================================
+unit-test-vitest:
+  stage: test
+  image: node:${NODE_VERSION}-bookworm-slim
+  cache:
+    <<: *default-cache
+  needs: ["build-typescript"]
+  script:
+    - npm run test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH'
+      when: on_success
+    - allow_failure: true
+
+# =============================================================================
+# E2E NIGHTLY (CHỈ CHẠY 2H SÁNG HÀNG NGÀY HOẶC MANUAL TRÊN MR)
+#   - Môi trường riêng: start API Nest + Vite qua playwright.config.ts webServer
+#   - 3 projects: chromium 99%, firefox 90% pass, webkit Safari 85% pass
+#   - Artifacts: trace.zip khi fail + junit XML hiển thị Gitlab UI Tests tab
+# =============================================================================
+e2e-playwright-nightly:
+  stage: e2e-nightly
+  image: mcr.microsoft.com/playwright:v1.52.0-noble
+  cache:
+    <<: *default-cache
+    policy: pull
+  needs: ["build-typescript", "build-vite-production"]
+  parallel:
+    matrix:
+      - PW_PROJECT: [chromium, firefox, mobile-chrome]
+  variables:
+    CI: "1"
+    FORCE_COLOR: "1"
+    NODE_ENV: "test"
+  before_script:
+    - node --version
+    - npm --version
+    - npx playwright --version
+    - ls -la node_modules 2>/dev/null | head -n 5 || true
+  script:
+    - echo "=== E2E NIGHTLY project=${PW_PROJECT} schedule=${CI_PIPELINE_SOURCE} ==="
+    - >
+      npx playwright test
+      --project="${PW_PROJECT}"
+      --reporter="list"
+      --reporter="junit"
+      --output="e2e/.test-artifacts/${PW_PROJECT}"
+      2>&1 | tee e2e.log
+  after_script:
+    - echo "E2E exit code = $?"
+    - ls -la e2e/.test-artifacts 2>/dev/null || echo "No artifacts"
+  artifacts:
+    when: always
+    expire_in: 30 days
+    name: "e2e-${CI_COMMIT_SHORT_SHA}-${PW_PROJECT}"
+    paths:
+      - e2e/.test-artifacts
+      - e2e/.report-html
+      - e2e/.state
+      - e2e.log
+    reports:
+      junit:
+        - e2e/.test-artifacts/junit-e2e.xml
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $CI_SCHEDULE_DESCRIPTION =~ /nightly-e2e/i'
+      when: always
+      allow_failure: true
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /e2e|run-e2e|E2E/i'
+      when: on_success
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"'
+      when: manual
+      allow_failure: true
+    - when: never
+
+# =============================================================================
+# E2E WEBKIT SAFARI nightly riêng (slow hơn, allow failure cao hơn)
+# =============================================================================
+e2e-playwright-webkit:
+  stage: e2e-nightly
+  image: mcr.microsoft.com/playwright:v1.52.0-noble
+  cache:
+    <<: *default-cache
+    policy: pull
+  needs: ["build-typescript", "build-vite-production"]
+  variables:
+    CI: "1"
+  script:
+    - npx playwright test --project=webkit --reporter=list 2>&1 | tee e2e-webkit.log
+  artifacts:
+    when: always
+    expire_in: 30 days
+    name: "e2e-${CI_COMMIT_SHORT_SHA}-webkit"
+    paths:
+      - e2e/.test-artifacts
+      - e2e-webkit.log
+    reports:
+      junit: e2e/.test-artifacts/junit-e2e.xml
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $CI_SCHEDULE_DESCRIPTION =~ /webkit|all/i'
+      when: always
+      allow_failure: true
+    - when: manual
+      allow_failure: true
+
+# =============================================================================
+# NOTIFY DEVONCALL TELEGRAM (nếu có TELEGRAM_BOT_TOKEN và CHAT_ID trong CI Variables)
+# =============================================================================
+notify-nightly-result:
+  stage: notify
+  image: curlimages/curl:8.12.1
+  needs: ["e2e-playwright-nightly", "e2e-playwright-webkit", "build-vite-production"]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+  script:
+    - |
+      if [ -z "${TELEGRAM_BOT_TOKEN}" ] || [ -z "${TELEGRAM_CHAT_ID}" ]; then
+        echo "Skip telegram notify: missing TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID CI masked variables"
+        exit 0
+      fi
+      ESCAPED_COMMIT=$(echo "${CI_COMMIT_TITLE:-no title}" | sed 's/[][()><*_~`#+=|{}.!-]/\\&/g' | cut -c -80)
+      TEXT="%F0%9F%9B%B8 *VNExplorer E2E Nightly Report*
+%E2%9C%85 Pipeline: \`${CI_PIPELINE_ID}\`
+Branch: \`${CI_COMMIT_BRANCH:-unknown}\`  Commit: \`${CI_COMMIT_SHORT_SHA}\`
+Title: ${ESCAPED_COMMIT}
+Result: [Open pipeline](${CI_PIPELINE_URL})"
+      curl -sS --max-time 10 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        -d "chat_id=${TELEGRAM_CHAT_ID}" \
+        -d "parse_mode=MarkdownV2" \
+        -d "disable_web_page_preview=true" \
+        --data-urlencode "text=${TEXT}" > /dev/null || true
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
