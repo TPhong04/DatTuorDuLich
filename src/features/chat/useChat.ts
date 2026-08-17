@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { apiFetch } from '@/lib/api'
 
 export type ChatRole = 'user' | 'bot' | 'system'
 
@@ -10,8 +11,11 @@ export interface ChatMessageItem {
 
 export type ChatStatus = 'BOT' | 'ESCALATED' | 'CLOSED'
 
-// Đổi URL này nếu backend chạy port khác, hoặc trỏ tới biến môi trường VITE_API_URL của bạn
-const API_URL = import.meta.env.VITE_CHAT_API_URL ?? 'http://localhost:4000/api/chat/message'
+interface ChatMessageResponse {
+  sessionId: string
+  status?: ChatStatus
+  reply?: string
+}
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessageItem[]>([])
@@ -32,24 +36,24 @@ export function useChat() {
       setIsSending(true)
 
       try {
-        const res = await fetch(API_URL, {
+        const data = await apiFetch<ChatMessageResponse>('/chat/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sessionIdRef.current, message: trimmed }),
+          body: JSON.stringify({
+            sessionId: sessionIdRef.current,
+            message: trimmed,
+          }),
         })
 
-        if (!res.ok) {
-          const errText = await res.text()
-          pushMessage('system', `Lỗi ${res.status}: ${errText}`)
-          return
-        }
-
-        const data = await res.json()
         sessionIdRef.current = data.sessionId
         setStatus(data.status ?? 'BOT')
         pushMessage('bot', data.reply ?? '(không có phản hồi)')
-      } catch (err) {
-        pushMessage('system', `Không kết nối được tới backend: ${(err as Error).message}`)
+      } catch (err: any) {
+        const statusCode = err?.status ?? ''
+        const msg = err?.message ?? (err as Error).message
+        const friendly = statusCode
+          ? `Lỗi ${statusCode}: ${msg}`
+          : `Không kết nối được tới hệ thống chat: ${msg}`
+        pushMessage('system', friendly)
       } finally {
         setIsSending(false)
       }

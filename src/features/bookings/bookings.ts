@@ -66,6 +66,8 @@ export type Booking = {
   paymentStatus: BookingPaymentStatus
   adminNote?: string | null
   createdBy?: string | null
+  assignedStaffIds?: string[]
+  updatedByStaffId?: string | null
   holdsUntil: string | null
   cancelledAt?: string | null
   confirmedAt?: string | null
@@ -462,6 +464,16 @@ export async function adminUpdateBookingStatus(idOrCode: string, body: {
   sendBackSeatsOnCancel?: boolean
 }) {
   return apiFetch<Booking>(`/admin/bookings/${encodeURIComponent(idOrCode)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function adminAssignBookingStaff(idOrCode: string, body: {
+  staffIds: string[]
+  adminNote?: string | null
+}) {
+  return apiFetch<Booking>(`/admin/bookings/${encodeURIComponent(idOrCode)}/assign-staff`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   })

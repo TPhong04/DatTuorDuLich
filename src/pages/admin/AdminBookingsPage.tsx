@@ -10,6 +10,7 @@ import {
   adminGetBooking,
   adminListBookings,
   adminUpdateBookingStatus,
+  adminAssignBookingStaff,
 } from '@/features/bookings/bookings'
 import { adminListUsers, AdminUser } from '@/features/admin/admin'
 import { cn } from '@/lib/utils'
@@ -158,10 +159,19 @@ export default function AdminBookingsPage() {
     try {
       const stamp = new Date().toLocaleString('vi-VN')
       const line = `【${stamp}】✅ Giao việc xử lý đơn cho nhân viên: ${staff.name} (${staff.email}${staff.phone ? ' · ' + staff.phone : ''}) — ID #${staff.id}`
-      setAdminNote((prev) => (prev ? `${prev}\n${line}` : line))
-      toast.success(`Đã ghi nhận giao đơn ${detail.code} cho nhân viên ${staff.name}. (Thông tin tạm lưu vào Ghi chú nội bộ — API Assign Staff sẽ được BE bật chính thức sau)`)
+      const combinedNote = adminNote ? `${adminNote}\n${line}` : line
+      const updated = await adminAssignBookingStaff(detail.id, {
+        staffIds: [String(assignStaffId)],
+        adminNote: combinedNote,
+      })
+      setDetail(updated)
+      setAdminNote(updated.adminNote || combinedNote)
+      refresh()
+      toast.success(`Đã giao đơn ${detail.code} cho nhân viên ${staff.name}. Staff đã thấy đơn ở trang Staff Bookings và nhận được thông báo trên hệ thống.`)
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Giao việc thất bại, vui lòng thử lại.')
     } finally {
-      setTimeout(() => setAssigningStaff(false), 500)
+      setAssigningStaff(false)
     }
   }
 
@@ -195,6 +205,8 @@ export default function AdminBookingsPage() {
       const d = await adminGetBooking(id)
       setDetail(d)
       setAdminNote(d.adminNote || '')
+      const firstAssigned = Array.isArray(d.assignedStaffIds) && d.assignedStaffIds.length ? String(d.assignedStaffIds[0]) : ''
+      if (firstAssigned) setAssignStaffId(firstAssigned)
     } catch (e) {
       toast.error((e as Error)?.message || 'Không tải được chi tiết booking.')
       setDetail(null)

@@ -22,7 +22,7 @@ import { TodosModule } from './todos/todos.module'
 import { ToursModule } from './tours/tours.module'
 import { UsersModule } from './users/users.module'
 import { MonitoringModule } from './monitoring/monitoring.module'
-
+import { ChatModule } from './chat/chat.module'
 const envSchema = z.object({
   PORT: z.string().optional(),
   MONGODB_URI: z.string().min(1),
@@ -30,6 +30,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(1),
   JWT_ACCESS_EXPIRES_IN: z.string().min(1),
   JWT_REFRESH_EXPIRES_IN: z.string().min(1),
+    GEMINI_API_KEY: z.string().min(1),
 })
 
 @Module({
@@ -59,6 +60,7 @@ const envSchema = z.object({
     ReviewsModule,
     NotificationsModule,
     GroupTourRequestsModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

@@ -6,7 +6,7 @@ import { JwtPayload } from '../auth/auth.types'
 import { NotificationsService, CreateNotificationInput } from '../notifications/notifications.service'
 import { NotificationType } from '../notifications/notification.schema'
 import { Booking, BookingDocument, BookingStatus, BookingTourSnapshot, BookingPassenger, BookingSurchargeLine } from './booking.schema'
-import { CreateBookingPayload, ListBookingsQuery, UpdateBookingStatusPayload } from './dto'
+import { CreateBookingPayload, ListBookingsQuery, UpdateBookingStatusPayload, AssignStaffBookingPayload } from './dto'
 import { Tour, TourDocument, TourDeparture } from '../tours/tour.schema'
 import { TransactionsService } from '../transactions/transactions.service'
 // #region debug-point booking-create-500
@@ -568,6 +568,72 @@ export class BookingsService {
       }
     } catch { /* best effort */ }
     try { await this.emitBookingStatusChanged(prevStatus, saved) } catch {}
+    return saved
+  }
+
+  async assignStaff(idOrCode: string, payload: AssignStaffBookingPayload, actor: JwtPayload | null = null): Promise<BookingDocument> {
+    const booking = await this.findByCodeOrId(idOrCode)
+    if (actor && String(actor.role || '').toLowerCase() !== 'admin') {
+      throw new ForbiddenException('Chỉ admin mới được quyền giao / thu hồi nhân viên phụ trách đơn đặt.')
+    }
+    const rawIds = Array.isArray(payload?.staffIds) ? payload.staffIds : []
+    const dedup = Array.from(new Set(rawIds.map((s) => String(s || '').trim()).filter(Boolean)))
+    const normalized: Types.ObjectId[] = []
+    for (const s of dedup) {
+      if (!Types.ObjectId.isValid(s)) throw new BadRequestException(`staffId không hợp lệ: ${s}`)
+      normalized.push(new Types.ObjectId(s))
+    }
+    if (normalized.length > 0) {
+      const exist = await this.bookingModel.db
+        .collection('users')
+        .find({ _id: { $in: normalized }, role: 'staff', isActive: { $ne: false } })
+        .project({ _id: 1 })
+        .toArray()
+      const validSet = new Set(exist.map((u) => String(u._id)))
+      for (const sid of normalized) {
+        if (!validSet.has(String(sid))) {
+          throw new BadRequestException(
+            `staffId=${sid} không tồn tại hoặc không phải nhân viên đang hoạt động (role=staff, isActive=true).`,
+          )
+        }
+      }
+    }
+    const before = Array.isArray(booking.assignedStaffIds) ? booking.assignedStaffIds.map((x) => String(x)) : []
+    const afterSet = new Set(normalized.map((x) => String(x)))
+    let changed = before.length !== afterSet.size
+    if (!changed) for (const bid of before) { if (!afterSet.has(bid)) { changed = true; break } }
+    booking.set('assignedStaffIds', normalized)
+    if (typeof payload.adminNote === 'string' && payload.adminNote) {
+      booking.set('adminNote', payload.adminNote)
+    }
+    const saved = await booking.save()
+    if (changed) {
+      try {
+        const stamp = new Date().toLocaleString('vi-VN')
+        const push: any[] = []
+        const recipientIds = normalized
+        const tourName = saved.tourSnapshot?.title || 'Tour'
+        const total = Number(saved.totalAmount || 0).toLocaleString('vi-VN') + 'đ'
+        const customer = saved.contact?.name || 'Khách'
+        for (const rid of recipientIds) {
+          const wasThere = before.includes(String(rid))
+          if (wasThere) continue
+          push.push({
+            recipientId: rid,
+            recipientRole: 'staff' as any,
+            type: 'staff_new_booking' as any,
+            title: `ĐƯỢC GIAO VIỆC - ${saved.code}`,
+            body: `Admin giao đơn ${saved.code} cho bạn phụ trách: ${tourName} ngày ${saved.departureDate ? new Date(saved.departureDate as any).toLocaleDateString('vi-VN') : '—'} — ${customer} — ${total}. Vui lòng gọi xác nhận và xử lý ngay!`,
+            entityType: 'booking' as any,
+            entityId: saved._id as any,
+            actionUrl: `/staff/bookings?id=${saved._id}`,
+            priority: 'high' as any,
+            channels: ['in_app'] as any[],
+          })
+        }
+        if (push.length) await this.notifications.bulk(push).catch(() => undefined)
+      } catch {}
+    }
     return saved
   }
 

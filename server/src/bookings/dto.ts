@@ -275,13 +275,15 @@ export const listBookingsQueryDto = z.object({
       '[List Bookings Fulltext Search] Tìm kiếm case-insensitive contains regex trên: booking.code, tourSnapshot.title (tên tour), contact.name, contact.phone, contact.email. 100 ký tự max.',
     ),
   page: z
+    .coerce
     .number()
     .int()
     .min(1)
     .optional()
     .default(1)
-    .describe('[List Bookings Pagination] Số trang hiện tại (bắt đầu = 1). Integer ≥1. Default 1.'),
+    .describe('[List Bookings Pagination] Số trang hiện tại (bắt đầu = 1). Integer ≥1. Default 1. (Auto coerce string→number từ HTTP query string).'),
   limit: z
+    .coerce
     .number()
     .int()
     .min(5)
@@ -289,10 +291,29 @@ export const listBookingsQueryDto = z.object({
     .optional()
     .default(20)
     .describe(
-      '[List Bookings Pagination] Số item / trang. Integer 5-100 (min=5 để không quá ít, max=100 để không OOM / response lớn). Default 20.',
+      '[List Bookings Pagination] Số item / trang. Integer 5-100 (min=5 để không quá ít, max=100 để không OOM / response lớn). Default 20. (Auto coerce string→number từ HTTP query string).',
+    ),
+})
+
+export const assignStaffBookingDto = z.object({
+  staffIds: z
+    .array(z.string().min(1).max(60))
+    .min(0)
+    .max(20)
+    .describe(
+      '[Admin Assign Staff Booking] Danh sách User ID (role=staff) được giao phụ trách đơn. Truyền [] (mảng rỗng) để BỎ giao toàn bộ nhân viên khỏi đơn. Mỗi phần tử: ObjectId 24 hex hoặc dạng khác được Types.ObjectId accept (tối đa 60 ký tự). Max 20 nhân viên / 1 booking.',
+    ),
+  adminNote: z
+    .string()
+    .max(2000)
+    .nullish()
+    .default(null)
+    .describe(
+      '[Admin Assign Staff Booking] Ghi chú nội bộ admin kèm theo hành động giao việc (VD: "Chị Hương chuyên tour miền Bắc - khách 3 người lớn 2 TE muốn ăn chay, phòng tầng thấp, hướng biển."). Max 2000 chars.',
     ),
 })
 
 export type CreateBookingPayload = z.infer<typeof createBookingDto>
 export type UpdateBookingStatusPayload = z.infer<typeof updateBookingStatusDto>
 export type ListBookingsQuery = z.infer<typeof listBookingsQueryDto>
+export type AssignStaffBookingPayload = z.infer<typeof assignStaffBookingDto>

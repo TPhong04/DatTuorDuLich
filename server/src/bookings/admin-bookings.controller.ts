@@ -27,7 +27,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtPayload } from '../auth/auth.types'
 import { BookingsService } from './bookings.service'
-import { listBookingsQueryDto, updateBookingStatusDto } from './dto'
+import { listBookingsQueryDto, updateBookingStatusDto, assignStaffBookingDto } from './dto'
 
 @ApiTags('Admin/Staff Bookings')
 @ApiBearerAuth('bearerJwt')
@@ -181,6 +181,49 @@ export class AdminBookingsController {
     }
 
     return this.adminItem(saved)
+  }
+
+  @Patch(':id/assign-staff')
+  @Roles('admin')
+  @ApiOperation({
+    summary: '[Admin only] Giao / Thu hồi nhân viên phụ trách Booking (cập nhật assignedStaffIds)',
+    description:
+      'Admin-only. Thay đổi danh sách nhân viên được phép xem / xử lý booking (ghi vào assignedStaffIds mảng ObjectId[]). Staff sau khi được assign sẽ thấy đơn ở staff dashboard / GET /admin/bookings (scope staff), mở chi tiết không còn báo 403. Nếu truyền staffIds=[] thì thu hồi toàn bộ nhân viên khỏi đơn. Kèm ghi chú adminNote (nội bộ) để ghi lý do giao việc. Sau khi assign, hệ thống tự động push thông báo in_app cho các staff mới được add: type=staff_new_booking, link /staff/bookings?id=bookingId.',
+  })
+  @ApiParam({ name: 'id', description: 'Booking _id (24 hex) hoặc booking.code (BK-VNEX-...)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['staffIds'],
+      properties: {
+        staffIds: {
+          type: 'array',
+          description: 'Mảng user._id (role=staff) được giao phụ trách. Dài 0..20 phần tử. [] = thu hồi toàn bộ.',
+          items: { type: 'string', minLength: 1, maxLength: 60, example: '67f2a8b3c4d5e6f7a8b9c0dd' },
+        },
+        adminNote: {
+          type: 'string',
+          nullable: true,
+          maxLength: 2000,
+          example: 'Giao chị Hương chuyên tour miền Bắc xử lý - KH 3 NL 2 TE muốn ăn chay, phòng tầng thấp, hướng biển. Gọi xác nhận trong 30 phút!',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: '200 OK: Booking đã cập nhật assignedStaffIds, đã push in_app notification tới các staff MỚI được add (không báo lại staff đã có từ trước).' })
+  @ApiResponse({ status: 400, description: '400 BadRequest: staffIds chứa id không phải ObjectId hợp lệ / KHÔNG tồn tại user role=staff isActive=true tương ứng (đã bị xoá / không hoạt động).' })
+  @ApiResponse({ status: 403, description: '403 Forbidden: chỉ role=admin mới được gọi endpoint này (staff/customer bị từ chối).' })
+  @ApiResponse({ status: 404, description: '404 Not Found: booking id/code không tồn tại.' })
+  async patchAssignStaff(@Param('id') id: string, @Body() body: any, @CurrentUser() user: JwtPayload) {
+    const parsed = assignStaffBookingDto.safeParse(body)
+    if (!parsed.success) {
+      const first = parsed.error.issues?.[0]
+      throw new BadRequestException(
+        'Dữ liệu assign staff không hợp lệ: ' + (first ? `${first.path.join('.')} ${first.message}` : 'invalid payload'),
+      )
+    }
+    const b = await this.bookingsService.assignStaff(id, parsed.data, user)
+    return this.adminItem(b)
   }
 
   adminItem(b: any) {
