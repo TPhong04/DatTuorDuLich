@@ -28,6 +28,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { JwtPayload } from '../auth/auth.types'
 import { BookingsService } from './bookings.service'
 import { listBookingsQueryDto, updateBookingStatusDto, assignStaffBookingDto } from './dto'
+import { assignVehiclesToBookingDto } from '../vehicles/dto'
 
 @ApiTags('Admin/Staff Bookings')
 @ApiBearerAuth('bearerJwt')
@@ -226,6 +227,44 @@ export class AdminBookingsController {
     return this.adminItem(b)
   }
 
+  @Patch(':id/assign-vehicles')
+  @Roles('admin', 'staff')
+  @ApiOperation({
+    summary: '[Admin / Staff] Gắn xe / Bỏ gắn xe vào Booking (cập nhật booking.vehicleIds)',
+    description:
+      'Admin và Staff VẬN HÀNH đều được phép gọi (phân quyền user chỉ định admin full CRUD xe, staff chỉ gắn xe vào booking tour). vehicleIds=[] tức là BỎ TOÀN BỘ xe khỏi đơn (thu hồi xe). Lưu cả 2 chiều: booking.vehicleIds + vehicle.bookingHistoryIds push bookingId tự động. Validate mỗi xe phải tồn tại, không được trạng thái out_of_service.',
+  })
+  @ApiParam({ name: 'id', description: 'Booking _id (24 hex) hoặc booking.code (BK-VNEX-...)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['vehicleIds'],
+      properties: {
+        vehicleIds: {
+          type: 'array',
+          description: 'Mảng vehicle._id (từ Quản lý xe) muốn gắn vào booking. [] = thu hồi toàn bộ xe khỏi đơn.',
+          items: { type: 'string', minLength: 1, example: '67f3a8b3c4d5e6f7a8b9c0dd' },
+          maxItems: 20,
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: '200 OK: Booking đã cập nhật vehicleIds + vehiclesAssignedAt/By, đã push bookingId vào vehicle.bookingHistoryIds.' })
+  @ApiResponse({ status: 400, description: '400 BadRequest: vehicleIds chứa id không tồn tại / xe trạng thái out_of_service không được gắn.' })
+  @ApiResponse({ status: 403, description: '403 Forbidden: không phải admin/staff.' })
+  @ApiResponse({ status: 404, description: '404 Not Found: booking không tồn tại.' })
+  async patchAssignVehicles(@Param('id') id: string, @Body() body: unknown, @CurrentUser() user: JwtPayload) {
+    const parsed = assignVehiclesToBookingDto.safeParse(body)
+    if (!parsed.success) {
+      const first = parsed.error.issues?.[0]
+      throw new BadRequestException(
+        'Dữ liệu gắn xe không hợp lệ: ' + (first ? `${first.path.join('.')} ${first.message}` : 'invalid payload'),
+      )
+    }
+    const b = await this.bookingsService.assignVehiclesToBooking(id, parsed.data.vehicleIds, user)
+    return this.adminItem(b)
+  }
+
   adminItem(b: any) {
     return {
       id: b._id?.toString?.() ?? b.id,
@@ -281,6 +320,9 @@ export class AdminBookingsController {
       createdBy: b.createdBy?.toString?.() ?? b.createdBy ?? null,
       assignedStaffIds: Array.isArray(b.assignedStaffIds) ? b.assignedStaffIds.map((x: any) => String(x)) : [],
       updatedByStaffId: b.updatedByStaffId ? String(b.updatedByStaffId) : null,
+      vehicleIds: Array.isArray(b.vehicleIds) ? b.vehicleIds.map((x: any) => String(x)) : [],
+      vehiclesAssignedAt: b.vehiclesAssignedAt ? new Date(b.vehiclesAssignedAt).toISOString() : null,
+      vehiclesAssignedByUserId: b.vehiclesAssignedByUserId ? String(b.vehiclesAssignedByUserId) : null,
       holdsUntil: b.holdsUntil ? new Date(b.holdsUntil).toISOString() : null,
       cancelledAt: b.cancelledAt ? new Date(b.cancelledAt).toISOString() : null,
       confirmedAt: b.confirmedAt ? new Date(b.confirmedAt).toISOString() : null,

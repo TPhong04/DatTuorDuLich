@@ -30,12 +30,19 @@ export class AuthService {
     return deriveKey256(secret, 'vnexplorer_totp_enc_salt')
   }
 
-  async register(input: { name: string; email: string; password: string }) {
+  async register(input: { name: string; email: string; password: string; phone?: string | null; gender?: 'male' | 'female' | 'other' | null; dateOfBirth?: string | null; citizenId?: string | null }) {
     const existing = await this.usersService.findByEmail(input.email)
     if (existing) throw new ConflictException('Email đã tồn tại')
     const passwordHash = await bcrypt.hash(input.password, 10)
     const user = await this.usersService.createUser({
-      name: input.name, email: input.email, passwordHash, role: 'customer',
+      name: input.name,
+      email: input.email,
+      passwordHash,
+      role: 'customer',
+      phone: typeof input.phone === 'string' ? input.phone.trim() || null : (input.phone ?? null),
+      gender: input.gender ?? null,
+      dateOfBirth: typeof input.dateOfBirth === 'string' ? input.dateOfBirth.trim() || null : (input.dateOfBirth ?? null),
+      citizenId: typeof input.citizenId === 'string' ? input.citizenId.trim() || null : (input.citizenId ?? null),
     })
     return { user }
   }

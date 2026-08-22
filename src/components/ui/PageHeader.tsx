@@ -16,15 +16,18 @@ export default function PageHeader({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-3xl bg-white p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100 md:flex md:items-center md:justify-between',
+        'card-hover relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-blue-50/40 to-orange-50/40 p-6 shadow-lg shadow-blue-900/5 ring-1 ring-blue-100 md:flex md:items-center md:justify-between',
         className,
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-800 via-orange-500 to-blue-800" />
+      <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br from-blue-400/20 to-orange-400/20 blur-2xl" />
+      <div className="absolute inset-x-0 top-0 h-[3px] gradient-sweep-x bg-gradient-to-r from-indigo-600 via-orange-500 to-blue-700" />
       <div className="relative pt-1">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-1.5 rounded-full bg-gradient-to-b from-orange-500 to-blue-800" />
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 md:text-2xl">{title}</h1>
+          <div className="relative">
+            <div className="h-9 w-1.5 rounded-full bg-gradient-to-b from-orange-500 via-indigo-500 to-blue-800 shadow-[0_0_12px_rgba(249,115,22,0.35)]" />
+          </div>
+          <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-indigo-800 via-blue-700 to-orange-600 bg-clip-text text-transparent md:text-2xl">{title}</h1>
         </div>
         {subtitle ? <p className="mt-2 pl-4 text-sm text-slate-600">{subtitle}</p> : null}
       </div>

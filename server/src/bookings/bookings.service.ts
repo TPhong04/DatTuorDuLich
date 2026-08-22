@@ -9,6 +9,8 @@ import { Booking, BookingDocument, BookingStatus, BookingTourSnapshot, BookingPa
 import { CreateBookingPayload, ListBookingsQuery, UpdateBookingStatusPayload, AssignStaffBookingPayload } from './dto'
 import { Tour, TourDocument, TourDeparture } from '../tours/tour.schema'
 import { TransactionsService } from '../transactions/transactions.service'
+import { UsersService } from '../users/users.service'
+import { VehiclesService } from '../vehicles/vehicles.service'
 // #region debug-point booking-create-500
 import { dbg } from '../_dbg'
 // #endregion
@@ -44,6 +46,8 @@ export class BookingsService {
     private readonly notifications: NotificationsService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly transactions: TransactionsService,
+    private readonly usersService: UsersService,
+    private readonly vehiclesService: VehiclesService,
   ) {
     try {
       const { CronJob } = require('cron') as typeof import('cron')
@@ -409,6 +413,19 @@ export class BookingsService {
         groupContactRole: typeof (payload as any).groupContactRole === 'string' ? (payload as any).groupContactRole.trim() || null : null,
         groupUploadedListFileUrl: typeof (payload as any).groupUploadedListFileUrl === 'string' ? (payload as any).groupUploadedListFileUrl.trim() || null : null,
         groupNote: typeof (payload as any).groupNote === 'string' ? (payload as any).groupNote.trim() || null : null,
+        vehicleRequest: typeof (payload as any).vehicleRequest === 'object' && (payload as any).vehicleRequest
+          ? {
+              enabled: Boolean((payload as any).vehicleRequest.enabled),
+              vehicleType: typeof (payload as any).vehicleRequest.vehicleType === 'string' ? (payload as any).vehicleRequest.vehicleType.trim() || null : null,
+              vehicleClass: typeof (payload as any).vehicleRequest.vehicleClass === 'string' ? (payload as any).vehicleRequest.vehicleClass.trim() || null : null,
+              seatCountMin: typeof (payload as any).vehicleRequest.seatCountMin === 'number' ? (payload as any).vehicleRequest.seatCountMin : null,
+              vehicleCount: typeof (payload as any).vehicleRequest.vehicleCount === 'number' ? Math.max(1, (payload as any).vehicleRequest.vehicleCount) : 1,
+              withDriver: (payload as any).vehicleRequest.withDriver !== false,
+              pickupLocation: typeof (payload as any).vehicleRequest.pickupLocation === 'string' ? (payload as any).vehicleRequest.pickupLocation.trim() || null : null,
+              returnLocation: typeof (payload as any).vehicleRequest.returnLocation === 'string' ? (payload as any).vehicleRequest.returnLocation.trim() || null : null,
+              notes: typeof (payload as any).vehicleRequest.notes === 'string' ? (payload as any).vehicleRequest.notes.trim() || null : null,
+            }
+          : null,
       } as any)
     } catch (createErr) {
       try {
@@ -427,6 +444,9 @@ export class BookingsService {
     try { await this.emitBookingCreatedNotifications(doc) } catch {}
     try { await this.transactions.recordSaleFromBooking(doc, { createdById: createdBy ?? null }) } catch (_errTxn) {
       // best effort, booking creation already committed — no throw
+    }
+    if (createdBy) {
+      try { await this.usersService.mergeBookingIntoCustomerProfileIfEmpty(createdBy, doc) } catch {}
     }
     return doc
   }
@@ -482,6 +502,22 @@ export class BookingsService {
       this.bookingModel.find(finalFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
       this.bookingModel.countDocuments(finalFilter),
     ])
+    try {
+      const unattachedIds = await this.bookingModel.find({ ...finalFilter, createdBy: { $in: [null, undefined] } }, { _id: 1 }).sort({ createdAt: -1 }).limit(2000).lean().exec()
+      if (unattachedIds.length) {
+        const idsArr = unattachedIds.map((r: any) => new Types.ObjectId(String(r._id)))
+        await this.bookingModel.updateMany({ _id: { $in: idsArr }, createdBy: { $in: [null, undefined] } }, { $set: { createdBy: userOid } }).exec()
+      }
+    } catch {}
+    try {
+      const latestForSync = await this.bookingModel.findOne(
+        { $or: [{ createdBy: userOid }, ...(orRoot.length > 1 ? [orRoot.find((r) => r && typeof r === 'object' && !('createdBy' in r)) || {}] : [])] } as any,
+        { contact: 1, passengers: 1, createdAt: 1, _id: 0 },
+      ).sort({ createdAt: -1 }).limit(1).exec()
+      if (latestForSync && (latestForSync.contact || (latestForSync.passengers && latestForSync.passengers.length))) {
+        try { await this.usersService.mergeBookingIntoCustomerProfileIfEmpty(userOid, latestForSync as any) } catch {}
+      }
+    } catch {}
     // #region debug-point listMyBookings-resolve
     ;(() => { let u = 'http://127.0.0.1:7788/event', s = 'notifications-push-slow-missing'; try { const e = require('fs').readFileSync('.dbg/notifications-push-slow-missing.env', 'utf8'); u = e.match(/DEBUG_SERVER_URL=(.+)/)?.[1] || u; s = e.match(/DEBUG_SESSION_ID=(.+)/)?.[1] || s } catch {} fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: s, runId: 'post-fix-h6', hypothesisId: 'A3', location: 'bookings.service.ts:253', msg: '[DEBUG] listMyBookings result for user', data: { userId: String(userOid), resolvedEmails: Array.from(emails), resolvedPhones: Array.from(phones), total, page, limit, firstId: items[0]?._id ? String(items[0]._id) : null, filter: JSON.stringify(finalFilter) }, ts: Date.now() }) }).catch(() => { }) })();
     // #endregion
@@ -875,6 +911,45 @@ export class BookingsService {
   })
   async releaseExpiredHoldsCronFallback() {
     try { await this.releaseExpiredHolds() } catch { /* noop */ }
+  }
+
+  async assignVehiclesToBooking(idOrCode: string, vehicleIdsRaw: string[], actor: JwtPayload | null = null): Promise<BookingDocument> {
+    if (!actor || !(actor.role === 'admin' || actor.role === 'staff')) {
+      throw new ForbiddenException('Chỉ admin / nhân viên vận hành mới được gắn xe vào đơn đặt.')
+    }
+    const booking = await this.findByCodeOrId(idOrCode)
+    if (!booking) throw new NotFoundException('Booking không tồn tại')
+    const rawIds = Array.isArray(vehicleIdsRaw) ? vehicleIdsRaw : []
+    const dedup = Array.from(new Set(rawIds.map((s) => String(s || '').trim()).filter(Boolean)))
+    if (dedup.length > 20) throw new BadRequestException('Gắn tối đa 20 xe vào mỗi đơn. Trường hợp đoàn siêu lớn gắn nhiều đợt.')
+    const oids: Types.ObjectId[] = []
+    for (const s of dedup) {
+      if (!Types.ObjectId.isValid(s)) throw new BadRequestException(`vehicleId không hợp lệ: ${s}`)
+      oids.push(new Types.ObjectId(s))
+    }
+    if (oids.length > 0) {
+      try {
+        const vs = (await this.vehiclesService.listSimple()) as unknown as Array<{ _id: Types.ObjectId; status: string }>
+        const validMap = new Map<string, { status: string }>()
+        for (const v of vs) validMap.set(String(v._id), { status: v.status || 'available' })
+        for (const oid of oids) {
+          if (!validMap.has(String(oid))) throw new BadRequestException(`Xe (id=${oid}) không tồn tại trong quản lý xe.`)
+          const info = validMap.get(String(oid))!
+          if (info.status === 'out_of_service') throw new BadRequestException(`Xe (id=${oid}) đang trạng thái "Ngừng hoạt động" không được gắn vào booking. Vui lòng đổi xe khác hoặc đổi trạng thái.`)
+        }
+      } catch (e) {
+        if (e instanceof NotFoundException || e instanceof BadRequestException || e instanceof ForbiddenException) throw e
+        throw new BadRequestException('Kiểm tra xe tồn tại thất bại: ' + (e as any)?.message)
+      }
+    }
+    booking.set('vehicleIds', oids)
+    booking.set('vehiclesAssignedAt', new Date())
+    if (actor?.sub) {
+      try { booking.set('vehiclesAssignedByUserId', new Types.ObjectId(String(actor.sub))) } catch { /* ignore */ }
+    }
+    const saved = await booking.save()
+    try { await this.vehiclesService.pushBookingHistoryMany(oids, saved._id as Types.ObjectId).catch(() => undefined) } catch { /* ignore best-effort */ }
+    return saved
   }
 
   async releaseExpiredHolds(): Promise<{ processed: number; released: number; returnedSeats: number; errors: number }> {

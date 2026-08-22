@@ -19,6 +19,7 @@ import {
 } from '@/features/notifications/notifications'
 import { getStoredUser } from '@/features/auth/auth'
 import { useNotificationSocket } from '@/features/notifications/useNotificationSocket'
+import { resolveFileUrl } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 type Scope = 'customer' | 'staff' | 'admin'
@@ -196,6 +197,8 @@ export default function NotificationsListPage({ scope }: { scope: Scope }) {
           >
             <option value="">Tất cả loại</option>
             {[
+              ['rental_inquiry_confirmed','KH: Yêu cầu thuê xe đã xác nhận & Báo giá PDF'],
+              ['admin_rental_inquiry_confirmed','NV/Admin: Xác nhận yêu cầu thuê xe'],
               ['gtr_created','Yêu cầu Tour đoàn mới'],
               ['gtr_assigned_staff','Admin giao đơn'],
               ['gtr_contacted','Đã liên hệ'],
@@ -289,6 +292,28 @@ export default function NotificationsListPage({ scope }: { scope: Scope }) {
                             {row.entityType.replace(/_/g, ' ')} · {String(row.entityId).slice(0, 8)}
                           </span>
                         )}
+                        {((row.payload as any)?.pdfDownloadUrl || (row.payload as any)?.quotationPdfUrlPath || (row.payload as any)?.pdfPath) && (() => {
+                          const pdfUrl = String(((row.payload as any)?.pdfDownloadUrl ?? (row.payload as any)?.quotationPdfUrlPath ?? (row.payload as any)?.pdfPath) as string)
+                          const price = Number((row.payload as any)?.totalGrandVnd ?? (row.payload as any)?.totalVnd ?? 0)
+                          const deposit = Number((row.payload as any)?.depositRequiredVnd ?? (row.payload as any)?.depositVnd ?? 0)
+                          const priceTxt = price > 0 ? ` · Tổng ${price.toLocaleString('vi-VN')}đ` : ''
+                          const depositTxt = deposit > 0 ? ` · Cọc ${deposit.toLocaleString('vi-VN')}đ` : ''
+                          const suggestName = `Bao-gia-${String((row.payload as any)?.inquiryCode ?? (row as any).code ?? String(row.entityId ?? '').slice(0, 10) ?? row._id)}.pdf`
+                          return (
+                            <>
+                              {(priceTxt || depositTxt) && (
+                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700">
+                                  💼 Báo giá{priceTxt}{depositTxt}
+                                </span>
+                              )}
+                              <a href={resolveFileUrl(pdfUrl) || pdfUrl} target="_blank" rel="noopener noreferrer" download={suggestName}
+                                onClick={() => { if (!row.isRead) void markRead(row) }}
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-emerald-500 ring-1 ring-emerald-200 transition shadow-sm">
+                                📥 Tải báo giá PDF
+                              </a>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">

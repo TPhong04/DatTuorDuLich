@@ -14,9 +14,9 @@ const cards = [
     to: '/services/flight-ticket',
   },
   {
-    title: 'Thuê xe',
-    desc: 'Thuê xe theo giờ/ngày, nội thành và liên tỉnh.',
-    to: '/services/car-rental',
+    title: 'Cho thuê xe',
+    desc: 'Thuê xe theo giờ/ngày, nội thành và liên tỉnh – 4 loại xe, 5 kích cỡ chỗ.',
+    to: '/cho-thue-xe',
   },
 ]
 

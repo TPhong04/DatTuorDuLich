@@ -127,6 +127,19 @@ export class Booking {
   })
   paymentStatus!: BookingPaymentStatus
 
+  @Prop({ type: Object, default: null })
+  vehicleRequest!: {
+    enabled: boolean
+    vehicleType?: string | null
+    vehicleClass?: string | null
+    seatCountMin?: number | null
+    vehicleCount?: number
+    withDriver?: boolean
+    pickupLocation?: string | null
+    returnLocation?: string | null
+    notes?: string | null
+  } | null
+
   @Prop({ type: String, default: null, trim: true })
   adminNote!: string | null
 
@@ -175,6 +188,15 @@ export class Booking {
   @Prop({ type: Types.ObjectId, default: null, index: true, ref: 'User' })
   updatedByStaffId!: Types.ObjectId | null
 
+  @Prop({ type: [Types.ObjectId], default: [], index: true, ref: 'Vehicle' })
+  vehicleIds!: Types.ObjectId[]
+
+  @Prop({ type: Date, default: null })
+  vehiclesAssignedAt!: Date | null
+
+  @Prop({ type: Types.ObjectId, default: null, index: true, ref: 'User' })
+  vehiclesAssignedByUserId!: Types.ObjectId | null
+
   createdAt!: Date
   updatedAt!: Date
 }
@@ -190,3 +212,4 @@ BookingSchema.index({ assignedStaffIds: 1, status: 1, createdAt: -1 }, { name: '
 BookingSchema.index({ paymentStatus: 1, createdAt: -1 }, { name: 'finance_paymentstatus_created_outstanding' })
 BookingSchema.index({ paymentStatus: 1, status: 1, createdAt: -1 }, { name: 'finance_payment_and_status_created' })
 BookingSchema.index({ tourId: 1, status: 1, departureDate: 1 }, { name: 'tour_bookings_by_tourid_status_departure' })
+BookingSchema.index({ vehicleIds: 1 }, { name: 'vehicles_assigned_multikey' })

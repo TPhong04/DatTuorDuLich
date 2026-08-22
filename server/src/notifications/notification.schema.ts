@@ -36,6 +36,8 @@ export type NotificationType =
   | 'user_login_new_device'
   | 'survey_nps'
   | 'system_info'
+  | 'rental_inquiry_confirmed'
+  | 'admin_rental_inquiry_confirmed'
 
 @Schema({ timestamps: true, collection: 'notifications' })
 export class Notification {

@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, BookOpen, CalendarDays, ClipboardList, FileText, Home, LayoutDashboard, LogOut, MessageSquareHeart } from 'lucide-react'
+import { Bell, BookOpen, CalendarDays, Car, ClipboardList, FileText, Home, Key, LayoutDashboard, LogOut, MessageSquareHeart } from 'lucide-react'
 
 import logo from '@/assets/logo.png'
 import NotificationBell from '@/components/notifications/NotificationBell'
@@ -56,6 +56,8 @@ export default function StaffShell() {
       label: 'Vận hành',
       items: [
         { label: 'Bookings', to: '/staff/bookings', icon: <ClipboardList className="h-4 w-4" /> },
+        { label: 'Quản lý xe', to: '/staff/vehicles', icon: <Car className="h-4 w-4" /> },
+        { label: 'Cho thuê xe', to: '/staff/rentals', icon: <Key className="h-4 w-4" /> },
         { label: 'Tours', to: '/staff/tours', icon: <BookOpen className="h-4 w-4" /> },
         { label: 'Lịch khởi hành', to: '/staff/departures', icon: <CalendarDays className="h-4 w-4" /> },
         { label: 'Tour đoàn', to: '/staff/group-tour-requests', icon: <FileText className="h-4 w-4" /> },

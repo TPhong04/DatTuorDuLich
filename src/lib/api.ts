@@ -165,3 +165,24 @@ async function apiFetchWithRetry<T>(input: string, init: RequestInit | undefined
 
   return (await res.json()) as T
 }
+
+/**
+ * Resolves a relative (/pdfs/... | /uploads/...) or absolute file URL for download.
+ * - Already absolute (http/https) → returned as-is.
+ * - Relative pdfs/uploads in environments where backend runs on a different host
+ *   (staging / production with split domains) → prepend VITE_API_TARGET if defined.
+ * - Local vite dev always proxies these paths; but prepending the direct API target
+ *   is also safe and avoids SPA fallback when opening the URL in a new tab.
+ */
+export function resolveFileUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  const trimmed = String(url).trim()
+  if (!trimmed) return undefined
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  const env: Record<string, string | undefined> = ((import.meta as any).env || {}) as Record<string, string | undefined>
+  const target = String(env.VITE_API_TARGET || '').trim()
+  if (target && /^https?:\/\//i.test(target) && (trimmed.startsWith('/pdfs/') || trimmed.startsWith('/uploads/'))) {
+    return `${target.replace(/\/+$/, '')}${trimmed}`
+  }
+  return trimmed
+}

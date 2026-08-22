@@ -10,6 +10,8 @@ import { ToursService } from './tours/tours.service'
 import { UsersService } from './users/users.service'
 import { GroupTourRequestsService } from './group-tour-requests/group-tour-requests.service'
 import { GroupTourRequestStatus, GroupTourRequestPriority } from './group-tour-requests/group-tour-request.schema'
+import { VehiclesService } from './vehicles/vehicles.service'
+import { VehicleType, VehicleClass, VEHICLE_TYPE_SEATS, VEHICLE_TYPE_SUITABILITY, VEHICLE_CLASS_DESCRIPTIONS } from './vehicles/vehicle.schema'
 
 type SeedStaff = { _id: Types.ObjectId; name: string; email: string; phone: string }
 
@@ -43,6 +45,109 @@ async function seedStaff(users: UsersService): Promise<SeedStaff[]> {
     })
   }
   return out
+}
+
+type SeedVehicleBase = {
+  licensePlate: string
+  vehicleType: VehicleType
+  vehicleClass: VehicleClass
+  brand: string
+  color: string
+  manufactureYear: number
+  mileageKm: number
+  rentalPricePerDayVnd: number
+  rentalSelfDrivePricePerDayVnd: number
+  nextMaintenanceOffsetDays: number
+  status: 'available' | 'in_trip' | 'maintenance'
+  notes?: string
+}
+
+const BASE_PRICES: Record<VehicleType, number> = {
+  seater_4: 2800000,
+  seater_7: 3800000,
+  seater_16: 5200000,
+  seater_29: 7800000,
+  seater_45: 9800000,
+}
+
+const CLASS_MULTIPLIER: Record<VehicleClass, number> = {
+  seat: 1.0,
+  sleeper: 1.15,
+  limousine: 1.3,
+  cabin: 1.4,
+}
+
+function mkVehicle(
+  licensePlate: string,
+  vehicleType: VehicleType,
+  vehicleClass: VehicleClass,
+  brand: string,
+  color: string,
+  manufactureYear: number,
+  mileageKm: number,
+  opts: Partial<Pick<SeedVehicleBase, 'rentalPricePerDayVnd' | 'rentalSelfDrivePricePerDayVnd' | 'status' | 'nextMaintenanceOffsetDays' | 'notes'>> = {}
+): SeedVehicleBase {
+  const base = BASE_PRICES[vehicleType] * (CLASS_MULTIPLIER[vehicleClass] || 1)
+  return {
+    licensePlate,
+    vehicleType,
+    vehicleClass,
+    brand,
+    color,
+    manufactureYear,
+    mileageKm,
+    rentalPricePerDayVnd: opts.rentalPricePerDayVnd ?? Math.round(base / 10000) * 10000,
+    rentalSelfDrivePricePerDayVnd: opts.rentalSelfDrivePricePerDayVnd ?? Math.round(base * 0.65 / 10000) * 10000,
+    nextMaintenanceOffsetDays: opts.nextMaintenanceOffsetDays ?? 60 + Math.floor(Math.random() * 120),
+    status: opts.status ?? 'available',
+    notes: opts.notes,
+  }
+}
+
+const VEHICLES_SEED: SeedVehicleBase[] = [
+  mkVehicle('30A-123.45', 'seater_4', 'seat', 'Toyota Vios', 'Trắng ngọc', 2023, 32000),
+  mkVehicle('30G-234.56', 'seater_4', 'seat', 'Hyundai Accent', 'Bạc', 2024, 18000),
+  mkVehicle('51F-888.88', 'seater_4', 'limousine', 'Mercedes-Maybach S450', 'Đen', 2024, 5600),
+  mkVehicle('51B-777.77', 'seater_7', 'seat', 'Toyota Innova Crysta', 'Xám kim loại', 2023, 45000),
+  mkVehicle('51C-666.66', 'seater_7', 'seat', 'Kia Sedona Carnival', 'Trắng', 2024, 22000),
+  mkVehicle('30H-999.99', 'seater_7', 'sleeper', 'Ford Transit Limousine', 'Xanh đậm', 2023, 38000, { notes: 'Xe 9 chỗ giường nằm VIP, xe cao cấp' }),
+  mkVehicle('30E-111.22', 'seater_16', 'seat', 'Hyundai County', 'Vàng đất', 2022, 78000),
+  mkVehicle('51D-333.44', 'seater_16', 'limousine', 'Samco Limousine 16 chỗ', 'Đen tuyền', 2024, 12000, { notes: 'Limousine 16 chỗ có ghế massage, cabin riêng' }),
+  mkVehicle('30B-555.66', 'seater_29', 'seat', 'Thaco Universe', 'Xanh dương nhạt', 2023, 62000),
+  mkVehicle('51A-777.88', 'seater_29', 'sleeper', 'Scania Touring HD', 'Trắng - Vàng', 2024, 9000, { notes: 'Xe giường nằm đời mới 29 tầng 1, sàn thấp, có WC' }),
+  mkVehicle('30D-111.99', 'seater_45', 'seat', 'Hyundai Universe Express Noble', 'Xanh lá đậm', 2022, 95000),
+  mkVehicle('51E-222.11', 'seater_45', 'sleeper', 'Scania K410 Sleeper', 'Trắng - Xanh Bờ Tây', 2023, 48000, { notes: 'Sleeper 45 chỗ 2 tầng, xe đò cao cấp, có khoang hành lý rộng' }),
+]
+
+async function seedVehicles(vehiclesSvc: VehiclesService) {
+  const list = await vehiclesSvc.listAdmin({ page: 1, limit: 1 })
+  if ((list.total || 0) >= 10) return
+  for (const v of VEHICLES_SEED) {
+    try {
+      const seatCount = VEHICLE_TYPE_SEATS[v.vehicleType]
+      await vehiclesSvc.create({
+        licensePlate: v.licensePlate,
+        vehicleType: v.vehicleType,
+        vehicleClass: v.vehicleClass,
+        seatCount,
+        brand: v.brand,
+        color: v.color,
+        manufactureYear: v.manufactureYear,
+        mileageKm: v.mileageKm,
+        rentalPricePerDayVnd: v.rentalPricePerDayVnd,
+        rentalSelfDrivePricePerDayVnd: v.rentalSelfDrivePricePerDayVnd,
+        nextMaintenanceDate: new Date(Date.now() + v.nextMaintenanceOffsetDays * 86400 * 1000).toISOString(),
+        showInPublicOptions: true,
+        status: v.status,
+        publicDisplayName: `${v.brand} ${v.vehicleClass === 'seat' ? '' : v.vehicleClass === 'sleeper' ? 'Sleeper ' : v.vehicleClass === 'limousine' ? 'Limousine ' : ''}${seatCount} chỗ · ${v.licensePlate}`,
+        publicSuitability: VEHICLE_TYPE_SUITABILITY[v.vehicleType] + ' — ' + VEHICLE_CLASS_DESCRIPTIONS[v.vehicleClass],
+        statusReason: v.status === 'available' ? null : v.status === 'maintenance' ? 'Bảo dưỡng định kỳ tháng' : 'Đang phục vụ đoàn tour',
+        notes: v.notes ?? null,
+      } as any)
+    } catch (e: any) {
+      // skip duplicates (unique license plate) or other validation errors
+    }
+  }
 }
 
 async function seedGroupTourRequests(svc: GroupTourRequestsService, staffList: SeedStaff[]) {
@@ -204,6 +309,7 @@ async function seed() {
   const tours = app.get(ToursService)
   const bookings = app.get(BookingsService)
   const groupTours = app.get(GroupTourRequestsService)
+  const vehicles = app.get(VehiclesService)
 
   const email = (process.env.ADMIN_EMAIL ?? '').trim()
   const password = process.env.ADMIN_PASSWORD ?? ''
@@ -408,6 +514,7 @@ async function seed() {
             notes: 'Khách có quà cáp cần khoá hành lý riêng, cần hỗ trợ khi lên xe.',
             paymentMethod: 'bank_transfer',
             agreeTerms: true,
+            vehicleRequest: null,
           }, null)
           // Đơn 2: new, dep21, 1 NL + 1 EB, hold
           const b2 = await bookings.createBookingForTour(sampleSlug, {
@@ -426,6 +533,7 @@ async function seed() {
             notes: 'Đơn đặt cọc giữ chỗ 24h, sẽ thanh toán CK đầy đủ sau khi nhận email xác nhận.',
             paymentMethod: 'hold',
             agreeTerms: true,
+            vehicleRequest: null,
           }, null)
           // Đơn 3: confirmed, dep7, 2 NL + 1 TE, CK đã thanh toán
           const b3 = await bookings.createBookingForTour(sampleSlug, {
@@ -445,6 +553,7 @@ async function seed() {
             notes: 'Chuyển khoản ngân hàng Vietcombank ngày 02/06, mã GD CB234589991.',
             paymentMethod: 'bank_transfer',
             agreeTerms: true,
+            vehicleRequest: null,
           }, null)
           await bookings.updateStatus(b3.id || b3.code, { status: 'confirmed', adminNote: 'Đã nhận tiền đủ, KXN email ngày xác nhận booking mẫu.', sendBackSeatsOnCancel: false })
           // Đơn 4: confirmed, dep21, 4 NL (nhóm bạn)
@@ -464,6 +573,7 @@ async function seed() {
             notes: 'Nhóm bạn sinh viên, phương thức thanh toán tiền mặt khi nhận vé tại văn phòng ngày 12/6.',
             paymentMethod: 'hold',
             agreeTerms: true,
+            vehicleRequest: null,
           }, null)
           await bookings.updateStatus(b4.id || b4.code, { status: 'confirmed', adminNote: 'Đã nhận tiền mặt tại VP, nhân viên An kiểm tra.', sendBackSeatsOnCancel: false })
           // Đơn 5: cancelled, dep7, 3 NL - (test trả chỗ)
@@ -482,6 +592,7 @@ async function seed() {
             notes: 'Khách gặp việc gia đình đột xuất, hủy trước ngày đi 28 ngày.',
             paymentMethod: 'bank_transfer',
             agreeTerms: true,
+            vehicleRequest: null,
           }, null)
           await bookings.updateStatus(b5.id || b5.code, { status: 'cancelled', adminNote: 'Hủy theo yêu cầu khách + hoàn tiền 70% theo điều khoản hủy tour 20+ ngày.', sendBackSeatsOnCancel: true })
         } catch {
@@ -501,6 +612,7 @@ async function seed() {
 
   const seededStaff = await seedStaff(users)
   await seedGroupTourRequests(groupTours, seededStaff)
+  await seedVehicles(vehicles)
 
   await app.close()
 }

@@ -8,9 +8,11 @@ import { MeBookingsController } from './me-bookings.controller'
 import { AdminBookingsController } from './admin-bookings.controller'
 import { ToursModule } from '../tours/tours.module'
 import { TransactionsModule } from '../transactions/transactions.module'
+import { UsersModule } from '../users/users.module'
+import { VehiclesModule } from '../vehicles/vehicles.module'
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Booking.name, schema: BookingSchema }]), ToursModule, TransactionsModule],
+  imports: [MongooseModule.forFeature([{ name: Booking.name, schema: BookingSchema }]), ToursModule, TransactionsModule, UsersModule, VehiclesModule],
   controllers: [TourBookingsController, MeBookingsController, AdminBookingsController],
   providers: [BookingsService],
   exports: [BookingsService, MongooseModule],

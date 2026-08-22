@@ -4,7 +4,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useToast } from '@/components/notifications/ToastProvider'
 import { DateInput } from '@/components/ui/DateInput'
 import { BookingWizardProvider, useBookingWizard } from '@/features/bookings/BookingWizardContext'
-import { BookingPassenger, BookingSurchargeLine, createPublicBooking } from '@/features/bookings/bookings'
+import { BookingPassenger, BookingSurchargeLine, BookingVehicleRequest, createPublicBooking } from '@/features/bookings/bookings'
+import { VEHICLE_CLASS_OPTIONS, VEHICLE_TYPE_OPTIONS } from '@/features/rentals/rentals'
 import { getPublicTour } from '@/features/tours/tours'
 import { useAuth } from '@/features/auth/auth.hooks'
 import type { PublicTourDetail, PublicTourDeparture } from '@/features/tours/tours'
@@ -206,7 +207,7 @@ function SidebarSummary({ tour, dep }: { tour: PublicTourDetail | null; dep: Pub
 }
 
 function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDetail | null; toast: ReturnType<typeof useToast> }) {
-  const { draft, setDepartureId, setPax, setSeatsAvailableLimit, setTourSlug, totalPax, remainingPaxCap } = useBookingWizard()
+  const { draft, setDepartureId, setPax, setGroup, setSeatsAvailableLimit, setTourSlug, totalPax, remainingPaxCap } = useBookingWizard()
   useEffect(() => {
     if (tour?.slug && draft.tourSlug !== tour.slug) setTourSlug(tour.slug)
   }, [tour?.slug, draft.tourSlug])
@@ -222,7 +223,8 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
   useEffect(() => {
     setSeatsAvailableLimit(selectedDep?.status === 'open' ? (selectedDep.seatsAvailable ?? null) : 0)
   }, [selectedDep?.id, selectedDep?.status, selectedDep?.seatsAvailable])
-  const retailMax = 20
+  const isGroup = Boolean(draft.group?.isGroupTour)
+  const retailMax = isGroup ? 500 : 20
   const overLimit = (selectedDep?.seatsAvailable ?? 0) < totalPax
   return (
     <div className="space-y-5">
@@ -259,7 +261,36 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
           </div>
         </div>
       </SectionCard>
-      <SectionCard title="2. Chọn số lượng hành khách" desc="Người lớn (≥ 11 tuổi) · Trẻ em (2–10) · Em bé (< 2 tuổi).">
+
+      <SectionCard title="2. Chọn hình thức đặt tour" desc="Chọn Tour lẻ nếu đi ít người, Tour đoàn nếu đi nhóm 10 người trở lên / doanh nghiệp / gia đình lớn.">
+        <div className="grid gap-3 md:grid-cols-2">
+          <button type="button" onClick={() => { setGroup({ isGroupTour: false }) }} className={'rounded-2xl border p-4 text-left transition ' + (!isGroup ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30')}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 text-lg">🧑‍🤝‍🧑</div>
+              <div>
+                <div className="text-sm font-black text-slate-900">Tour Lẻ (tối đa 20 khách)</div>
+                <div className="text-xs text-slate-500">Nhập thông tin từng hành khách (họ tên / ngày sinh / CCCD).</div>
+              </div>
+            </div>
+          </button>
+          <button type="button" onClick={() => { setGroup({ isGroupTour: true }) }} className={'rounded-2xl border p-4 text-left transition ' + (isGroup ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30')}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-orange-600 to-amber-500 text-lg">👔</div>
+              <div>
+                <div className="text-sm font-black text-slate-900">Tour Đoàn (doanh nghiệp / 10+ người)</div>
+                <div className="text-xs text-slate-500">Không cần nhập 100 tên. Upload file danh sách Excel / gửi sau.</div>
+              </div>
+            </div>
+          </button>
+        </div>
+        {isGroup ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-gradient-to-br from-amber-50/60 to-orange-50/40 p-4 text-xs text-amber-800">
+            💡 Bạn không cần nhập Họ tên từng người ngay bây giờ. Hệ thống sẽ tạm tạo danh sách placeholder theo tổng số NL/TE/EB. Bạn sẽ bổ sung danh sách cuối (Excel) qua email nhân viên sau 5-7 ngày trước khởi hành. Tối đa 500 khách cho đoàn lớn.
+          </div>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard title="3. Chọn số lượng hành khách" desc={isGroup ? 'Số lượng tối đa 500 khách cho đoàn lớn · Người lớn (≥ 11 tuổi) · Trẻ em (2–10) · Em bé (< 2 tuổi).' : 'Người lớn (≥ 11 tuổi) · Trẻ em (2–10) · Em bé (< 2 tuổi).'}>
         <div className="grid gap-3 md:grid-cols-3">
           <PaxStepper label="👤 Người lớn (NL)" value={draft.pax.adult} onChange={(n) => setPax({ adult: n })} max={Math.max(0, draft.pax.adult + remainingPaxCap)} disabledPlus={remainingPaxCap <= 0 || draft.pax.adult >= retailMax} />
           <PaxStepper label="🧒 Trẻ em (TE)" value={draft.pax.child} onChange={(n) => setPax({ child: n })} max={Math.max(0, draft.pax.child + remainingPaxCap)} disabledPlus={remainingPaxCap <= 0 || draft.pax.child >= retailMax} />
@@ -270,7 +301,7 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
             {overLimit
               ? `⚠️ Vượt quá giới hạn: ${totalPax} khách đã chọn > ${selectedDep.seatsAvailable} chỗ còn trống. Vui lòng giảm số lượng hành khách hoặc chọn đợt khởi hành khác.`
               : totalPax > 0
-                ? `✅ ${totalPax} hành khách đã chọn · Còn ${Math.max(0, (selectedDep.seatsAvailable ?? 0) - totalPax)} chỗ trống · 1 giao dịch tối đa ${retailMax} khách (đoàn lớn liên hệ Tour đoàn).`
+                ? `✅ ${totalPax} hành khách đã chọn · Còn ${Math.max(0, (selectedDep.seatsAvailable ?? 0) - totalPax)} chỗ trống · 1 giao dịch tối đa ${retailMax} khách${!isGroup ? ' (đoàn lớn vui lòng chọn Tour đoàn).' : ' (tối đa cho đoàn lớn).'}`
                 : `Đợt này còn ${selectedDep.seatsAvailable ?? 0} chỗ trống.`
             }
           </div>
@@ -283,7 +314,7 @@ function Step1({ onNext, tour, toast }: { onNext: () => void; tour: PublicTourDe
             if (!selectedDep) return toast.error('Vui lòng chọn đợt khởi hành trước khi tiếp tục.')
             if (selectedDep.status !== 'open') return toast.error('Đợt khởi hành này đã đóng bán, vui lòng chọn đợt khác.')
             if (totalPax <= 0) return toast.error('Vui lòng chọn ít nhất 1 hành khách.')
-            if (totalPax > retailMax) return toast.error(`1 lần đặt tối đa ${retailMax} hành khách, đoàn lớn vui lòng liên hệ Tour đoàn.`)
+            if (totalPax > retailMax) return toast.error(`1 lần đặt tối đa ${retailMax} hành khách.`)
             if ((selectedDep.seatsAvailable ?? 0) < totalPax) return toast.error(`Chỉ còn ${selectedDep.seatsAvailable} chỗ, vui lòng giảm số lượng hành khách.`)
             onNext()
           }}
@@ -490,32 +521,19 @@ function Step2({ onNext, onPrev, toast, dep }: { onNext: () => void; onPrev: () 
   void sharedState
   return (
     <div className="space-y-5">
-      <SectionCard title="Chế độ đặt tour" desc="Chọn Tour lẻ nếu đi ít người, Tour đoàn nếu đi nhóm 10 người trở lên / doanh nghiệp / gia đình lớn.">
-        <div className="grid gap-3 md:grid-cols-2">
-          <button type="button" onClick={() => { setGroup({ isGroupTour: false }) }} className={'rounded-2xl border p-4 text-left transition ' + (!isGroup ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30')}>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 text-lg">🧑‍🤝‍🧑</div>
-              <div>
-                <div className="text-sm font-black text-slate-900">Tour Lẻ (tối đa 20 khách)</div>
-                <div className="text-xs text-slate-500">Nhập thông tin từng hành khách (họ tên / ngày sinh / CCCD).</div>
-              </div>
+      <SectionCard title={`Hình thức đặt tour: ${isGroup ? '👔 Tour Đoàn' : '🧑‍🤝‍🧑 Tour Lẻ'}`} desc={isGroup ? 'Đặt cho doanh nghiệp / đoàn 10+ người. Bạn có thể thay đổi ở bước 1 nếu muốn đổi.' : 'Đặt cho gia đình / nhóm nhỏ (tối đa 20 khách). Bạn có thể thay đổi ở bước 1 nếu muốn đổi.'}>
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50/70 to-white p-4">
+          <div className="min-w-0 flex items-center gap-3">
+            <div className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl ' + (isGroup ? 'bg-gradient-to-br from-orange-600 to-amber-500' : 'bg-gradient-to-br from-blue-600 to-blue-500')}>{isGroup ? '👔' : '🧑‍🤝‍🧑'}</div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-black text-slate-900">{isGroup ? 'Tour Đoàn (doanh nghiệp / 10+ khách)' : 'Tour Lẻ (tối đa 20 khách)'}</div>
+              <div className="truncate text-xs text-slate-500">{isGroup ? 'Không cần nhập 100 tên ngay bây giờ. Upload file / gửi danh sách Excel sau cũng được.' : 'Nhập thông tin từng hành khách (họ tên, ngày sinh, CCCD).'}</div>
             </div>
-          </button>
-          <button type="button" onClick={() => { setGroup({ isGroupTour: true }) }} className={'rounded-2xl border p-4 text-left transition ' + (isGroup ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100' : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30')}>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-orange-600 to-amber-500 text-lg">👔</div>
-              <div>
-                <div className="text-sm font-black text-slate-900">Tour Đoàn (doanh nghiệp / 10+ người)</div>
-                <div className="text-xs text-slate-500">Không cần nhập 100 tên. Upload file danh sách Excel / gửi sau.</div>
-              </div>
-            </div>
-          </button>
-        </div>
-        {isGroup ? (
-          <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-gradient-to-br from-amber-50/60 to-orange-50/40 p-4 text-xs text-amber-800">
-            💡 Bạn không cần nhập Họ tên từng người ngay bây giờ. Hệ thống sẽ tạm tạo danh sách placeholder theo tổng số NL/TE/EB. Bạn sẽ bổ sung danh sách cuối (Excel) qua email nhân viên sau 5-7 ngày trước khởi hành.
           </div>
-        ) : null}
+          <div className="shrink-0 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+            Đã chọn ở bước 1 · <span className="text-orange-600">có thể thay đổi</span>
+          </div>
+        </div>
       </SectionCard>
 
       <SectionCard title="Thông tin người đặt" desc="Chúng tôi sẽ gọi điện xác nhận đơn đặt của bạn qua SĐT này.">
@@ -664,13 +682,25 @@ function Step2({ onNext, onPrev, toast, dep }: { onNext: () => void; onPrev: () 
   )
 }
 
-function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; onConfirm: (ok: { method: BookingPaymentMethod; surcharges: BookingSurchargeLine[]; agree: boolean }) => void; tour: PublicTourDetail | null; dep: PublicTourDeparture | null; toast: ReturnType<typeof useToast> }) {
+function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; onConfirm: (ok: { method: BookingPaymentMethod; surcharges: BookingSurchargeLine[]; agree: boolean; vehicleRequest: BookingVehicleRequest | null }) => void; tour: PublicTourDetail | null; dep: PublicTourDeparture | null; toast: ReturnType<typeof useToast> }) {
   const { draft, totalPax } = useBookingWizard()
   const [method, setMethod] = useState<BookingPaymentMethod>('hold')
   const [agree, setAgree] = useState(false)
   const defaults = useMemo(() => (tour?.surcharges || []).map((s) => ({ label: s.label, quantity: 0, unitPrice: Number(s.amount || 0), note: null })), [tour?.surcharges])
   const [surcharges, setSurcharges] = useState<BookingSurchargeLine[]>(defaults)
+  const [vehicleRequest, setVehicleRequest] = useState<BookingVehicleRequest>({
+    enabled: false,
+    vehicleType: '',
+    vehicleClass: '',
+    seatCountMin: null,
+    vehicleCount: 1,
+    withDriver: true,
+    pickupLocation: null,
+    returnLocation: null,
+    notes: null,
+  })
   useEffect(() => { setSurcharges(defaults) }, [defaults])
+  const ipt = "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none ring-orange-100 focus:border-orange-400 focus:ring-4"
   const paxPrices = useMemo(() => {
     if (!dep) return { adult: 0, child: 0, infant: 0, subtotal: 0 }
     const a = (draft.pax.adult || 0) * (dep.priceAdult || 0)
@@ -682,8 +712,8 @@ function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; on
   const grand = paxPrices.subtotal + surchTotal
   const submit = useCallback(() => {
     if (!agree) return toast.error('Vui lòng đồng ý điều khoản & chính sách hủy trước khi đặt.')
-    onConfirm({ method, surcharges, agree })
-  }, [agree, method, surcharges, onConfirm, toast])
+    onConfirm({ method, surcharges, agree, vehicleRequest: vehicleRequest.enabled ? vehicleRequest : null })
+  }, [agree, method, surcharges, vehicleRequest, onConfirm, toast])
   useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); submit() }
     document.addEventListener('booking-cta-step3-submit', handler as EventListener)
@@ -717,6 +747,67 @@ function Step3({ onPrev, onConfirm, tour, dep, toast }: { onPrev: () => void; on
           </div>
         )}
       </SectionCard>
+
+      {/* ======================== LUỒNG B: THUÊ XE KÈM TOUR ======================== */}
+      <SectionCard title="🚍 Thuê xe kèm Tour (Luồng B)" desc="Thêm dịch vụ xe riêng đón trả sân bay / đi kèm cả hành trình. Nhân viên sẽ gửi báo giá xe riêng sau.">
+        <label className={"flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 mb-4 transition-colors " + (vehicleRequest.enabled ? 'border-indigo-500 bg-indigo-50/50 ring-4 ring-indigo-100' : 'border-slate-200 bg-white hover:border-slate-300')}>
+          <input type="checkbox" className="mt-1 h-5 w-5 accent-indigo-600" checked={vehicleRequest.enabled} onChange={(e) => setVehicleRequest((v) => ({ ...v, enabled: e.target.checked }))} />
+          <div>
+            <div className="text-sm font-extrabold text-slate-900">Tôi muốn thuê xe riêng đi kèm tour</div>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              Khách đoàn / khách yêu cầu xe riêng đón trả sân bay, xe đi kèm cả hành trình thay vì xe chung của tour.
+              Nhân viên vận hành sẽ tự động tạo Yêu cầu thuê xe gắn đơn booking sau & báo giá chi tiết trong 30 phút.
+            </p>
+          </div>
+        </label>
+
+        {vehicleRequest.enabled ? (
+          <div className="grid gap-4 md:grid-cols-2 rounded-2xl border border-slate-200 bg-white p-5">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Loại xe yêu cầu</label>
+              <select className={ipt} value={vehicleRequest.vehicleType || ''} onChange={(e) => setVehicleRequest((v) => ({ ...v, vehicleType: e.target.value || null }))}>
+                <option value="">— Tự động phân bổ theo số khách —</option>
+                {VEHICLE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Phân loại xe</label>
+              <select className={ipt} value={vehicleRequest.vehicleClass || ''} onChange={(e) => setVehicleRequest((v) => ({ ...v, vehicleClass: e.target.value || null }))}>
+                <option value="">— Chọn (để trống = theo tiêu chuẩn tour) —</option>
+                {VEHICLE_CLASS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Số chỗ tối thiểu</label>
+              <input type="number" min={1} max={60} className={ipt} value={vehicleRequest.seatCountMin || ''} onChange={(e) => setVehicleRequest((v) => ({ ...v, seatCountMin: e.target.value ? Number(e.target.value) : null }))} placeholder={`VD: ${Math.max(4, Math.min(29, (draft.pax.adult || 1) + (draft.pax.child || 0) + 2))}`} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Số lượng xe</label>
+              <input type="number" min={1} max={20} className={ipt} value={vehicleRequest.vehicleCount || 1} onChange={(e) => setVehicleRequest((v) => ({ ...v, vehicleCount: Math.max(1, Number(e.target.value) || 1) }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Tài xế</label>
+              <select className={ipt} value={vehicleRequest.withDriver ? 'driver' : 'self'} onChange={(e) => setVehicleRequest((v) => ({ ...v, withDriver: e.target.value === 'driver' }))}>
+                <option value="driver">Có tài xế (khuyên dùng)</option>
+                <option value="self">Tự lái (dưới 16 chỗ)</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Điểm đón xe (nếu khác đi chơi)</label>
+              <input className={ipt} value={vehicleRequest.pickupLocation || ''} onChange={(e) => setVehicleRequest((v) => ({ ...v, pickupLocation: e.target.value || null }))} placeholder="VD: Sân bay Tân Sơn Nhất (SGN) - Cột 4 Domestic" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Điểm trả xe (nếu khác)</label>
+              <input className={ipt} value={vehicleRequest.returnLocation || ''} onChange={(e) => setVehicleRequest((v) => ({ ...v, returnLocation: e.target.value || null }))} placeholder="VD: Khách sạn InterContinental Saigon" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Ghi chú yêu cầu xe (có thể trống)</label>
+              <input className={ipt} value={vehicleRequest.notes || ''} onChange={(e) => setVehicleRequest((v) => ({ ...v, notes: e.target.value || null }))} placeholder="VD: xe màu trắng, wifi trên xe, tài xế nói tiếng Anh, ghế trẻ em số 2..." />
+            </div>
+          </div>
+        ) : null}
+      </SectionCard>
+
       <SectionCard title="Bảng giá chi tiết" desc="Tổng hợp giá tour + dịch vụ bổ sung theo đúng ảnh mẫu Datviettour.">
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="grid grid-cols-12 gap-2 bg-slate-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -920,7 +1011,7 @@ export default function BookingPage() {
               dep={selectedDep}
               tour={tour}
               onPrev={() => setStep(2)}
-              onConfirm={async ({ method, surcharges }) => {
+              onConfirm={async ({ method, surcharges, vehicleRequest }) => {
                 try {
                   const s2 = (window as any).__booking_step2_final
                   if (!s2) return toast.error('Vui lòng điền đầy đủ thông tin hành khách ở bước 2.')
@@ -949,6 +1040,7 @@ export default function BookingPage() {
                     groupContactRole: group.contactRole || null,
                     groupUploadedListFileUrl: group.uploadedListFileUrl || null,
                     groupNote: group.note || null,
+                    vehicleRequest: vehicleRequest ?? null,
                   } as any
                   try {
                     await fetch('http://127.0.0.1:7777/event', {

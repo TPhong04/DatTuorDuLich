@@ -57,9 +57,9 @@ export default function GroupTourPage() {
         title="👔 Tour đoàn doanh nghiệp & nhóm lớn"
         right={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <a href="tel:19001009" className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50">📞 1900 1009</a>
+            <a href="tel:19001009" className="btn-sweep-white inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50">📞 1900 1009</a>
             <Link
-              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/15 hover:opacity-95"
+              className="gradient-sweep-x inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-gradient-to-r from-blue-700 via-blue-600 to-orange-500 px-5 text-xs font-extrabold uppercase text-white shadow-sm shadow-orange-500/15 hover:opacity-95"
               to="/group-tour/request"
             >
               🚀 Gửi yêu cầu báo giá
@@ -68,7 +68,7 @@ export default function GroupTourPage() {
         }
       />
       {bannerSuccess}
-      <section className="overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-900 via-blue-800 to-orange-600 p-8 text-white shadow-2xl">
+      <section className="gradient-sweep-br overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-900 via-blue-800 to-orange-600 p-8 text-white shadow-2xl">
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wide backdrop-blur">🎯 Dành riêng cho đoàn & doanh nghiệp</div>
@@ -80,10 +80,10 @@ export default function GroupTourPage() {
               Không cần nhập 100 tên ngay: chỉ cần <span className="font-black">Upload file Excel</span> hoặc gửi danh sách sau.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/group-tour/request" className="inline-flex h-12 items-center rounded-2xl bg-white px-8 text-xs font-black uppercase text-blue-900 hover:bg-orange-50 shadow-lg">
+              <Link to="/group-tour/request" className="btn-sweep-white inline-flex h-12 items-center rounded-2xl bg-white px-8 text-xs font-black uppercase text-blue-900 hover:bg-orange-50 shadow-lg">
                 Bắt đầu gửi yêu cầu →
               </Link>
-              <a href="tel:19001009" className="inline-flex h-12 items-center rounded-2xl border-2 border-white/40 bg-white/5 px-8 text-xs font-black uppercase text-white hover:bg-white/10">
+              <a href="tel:19001009" className="btn-sweep-outline inline-flex h-12 items-center rounded-2xl border-2 border-white/40 bg-white/5 px-8 text-xs font-black uppercase text-white hover:bg-white/10">
                 📞 Tư vấn 1900 1009
               </a>
             </div>

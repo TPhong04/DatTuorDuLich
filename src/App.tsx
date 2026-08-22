@@ -25,6 +25,7 @@ import NewsDetailPage from '@/pages/NewsDetailPage'
 import NewsPage from '@/pages/NewsPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import RegisterPage from '@/pages/RegisterPage'
+import RentalsPage from '@/pages/RentalsPage'
 import ServiceDetailPage from '@/pages/ServiceDetailPage'
 import ServicesPage from '@/pages/ServicesPage'
 import StaffDashboardPage from '@/pages/StaffDashboardPage'
@@ -44,6 +45,8 @@ import AdminReportsPage from '@/pages/admin/AdminReportsPage'
 import AdminTourEditorPage from '@/pages/admin/AdminTourEditorPage'
 import AdminToursPage from '@/pages/admin/AdminToursPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminVehiclesPage from '@/pages/admin/AdminVehiclesPage'
+import AdminRentalsPage from '@/pages/admin/AdminRentalsPage'
 import AdminSettingsLayout from '@/pages/admin/settings/AdminSettingsLayout'
 import AdminSettingsIndexPage from '@/pages/admin/settings/AdminSettingsIndexPage'
 import AdminSettingsCompanyPage from '@/pages/admin/settings/AdminSettingsCompanyPage'
@@ -61,6 +64,8 @@ import StaffDeparturesPage from '@/pages/staff/StaffDeparturesPage'
 import StaffGroupTourRequestsPage from '@/pages/staff/StaffGroupTourRequestsPage'
 import StaffNotificationsPage from '@/pages/staff/StaffNotificationsPage'
 import StaffToursPage from '@/pages/staff/StaffToursPage'
+import StaffVehiclesPage from '@/pages/staff/StaffVehiclesPage'
+import StaffRentalsPage from '@/pages/staff/StaffRentalsPage'
 
 function BookingPublicRoute() {
   const { slug } = useParams<{ slug: string }>()
@@ -91,6 +96,7 @@ export default function App() {
             <Route path="/news/:slug" element={<NewsDetailPage />} />
 
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/cho-thue-xe" element={<RentalsPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/policy/cancel" element={<CancelPolicyPage />} />
 
@@ -119,6 +125,8 @@ export default function App() {
               <Route path="bookings" element={<StaffBookingsPage />} />
               <Route path="tours" element={<StaffToursPage />} />
               <Route path="departures" element={<StaffDeparturesPage />} />
+              <Route path="vehicles" element={<StaffVehiclesPage />} />
+              <Route path="rentals" element={<StaffRentalsPage />} />
               <Route path="group-tour-requests" element={<StaffGroupTourRequestsPage />} />
               <Route path="content/posts" element={<AdminContentPostsPage />} />
               <Route path="content/reviews" element={<StaffContentReviewsPage />} />
@@ -135,6 +143,8 @@ export default function App() {
               <Route path="departures" element={<AdminDeparturesPage />} />
               <Route path="catalog" element={<AdminCatalogPage />} />
               <Route path="bookings" element={<AdminBookingsPage />} />
+              <Route path="vehicles" element={<AdminVehiclesPage />} />
+              <Route path="rentals" element={<AdminRentalsPage />} />
               <Route path="group-tour-requests" element={<AdminGroupTourRequestsPage />} />
               <Route path="content/posts" element={<AdminContentPostsPage />} />
               <Route path="content/reviews" element={<AdminContentReviewsPage />} />

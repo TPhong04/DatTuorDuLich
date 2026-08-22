@@ -9,7 +9,7 @@ import type { Connection } from 'mongoose'
 import cookieParser from 'cookie-parser'
 import * as express from 'express'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { ZodError } from 'zod'
 
 import { AppModule } from './app.module'
@@ -108,6 +108,14 @@ async function bootstrap() {
     next()
   })
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')))
+  app.use('/pdfs', express.static(join(process.cwd(), 'pdfs'), {
+    maxAge: '31536000',
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.pdf')) {
+        res.setHeader('Content-Disposition', `attachment; filename="${basename(filePath)}"`)
+      }
+    },
+  }))
   applySentryRequestHandler(app)
 
   const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS)

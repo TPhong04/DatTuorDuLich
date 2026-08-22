@@ -46,3 +46,298 @@ a {
   100% { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes floatUp {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35); }
+  50%      { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+}
+
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.92); }
+  60%  { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shakeSoft {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes slideInRight {
+  0%   { opacity: 0; transform: translateX(24px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+
+@layer utilities {
+  /* ==== Animated cards (shadow lift + scale on hover) ==== */
+  .card-hover {
+    transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+                background-color 250ms ease;
+    will-change: transform, box-shadow;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.22),
+                0 10px 24px -12px rgba(15, 23, 42, 0.16);
+  }
+  .card-hover:active { transform: translateY(0) scale(1.002); }
+
+  /* ==== Animated buttons (primary & secondary) ==== */
+  .btn-hover {
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                background-color 200ms ease,
+                color 200ms ease,
+                border-color 200ms ease,
+                filter 200ms ease,
+                letter-spacing 220ms ease;
+    will-change: transform;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-hover:hover    { transform: translateY(-1.5px); filter: brightness(1.05); }
+  .btn-hover:active   { transform: translateY(0) scale(0.975); }
+  .btn-hover:disabled { transform: none !important; filter: grayscale(0.15) saturate(0.6) brightness(0.97); }
+
+  /* Ripple-shimmer overlay helper — add a child span with this class + group on parent */
+  .shimmer-line {
+    background-image: linear-gradient(
+      110deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.28) 45%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0.28) 55%,
+      transparent 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2.6s linear infinite;
+  }
+
+  /* ==== Badge / Pill / Tag hover ==== */
+  .pill-hover {
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+                background-color 180ms ease,
+                color 180ms ease,
+                ring-color 180ms ease,
+                padding 200ms ease;
+    will-change: transform;
+  }
+  .pill-hover:hover { transform: translateY(-1.5px) scale(1.04); }
+  .pill-hover:active { transform: translateY(0) scale(0.97); }
+
+  /* ==== Table row hover (float hint) ==== */
+  .tr-hover > td {
+    transition: background-color 220ms ease,
+                transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .tr-hover:hover > td {
+    background-color: rgba(99, 102, 241, 0.04);
+  }
+  .tr-hover:hover td:first-child {
+    transform: translateX(3px);
+  }
+
+  /* ==== Icon hover pop inside group ==== */
+  .icon-pop {
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                color 200ms ease,
+                opacity 200ms ease;
+  }
+  .group:hover .icon-pop { transform: translateX(3px) scale(1.12); }
+  .group:hover .icon-pop-left { transform: translateX(-3px) scale(1.12); }
+  .group:hover .icon-pop-up { transform: translateY(-3px) scale(1.12); }
+
+  /* ==== Stagger-in for list children (fade+up) ==== */
+  .stagger-in > * {
+    animation: floatUp 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger-in > *:nth-child(1) { animation-delay: 30ms; }
+  .stagger-in > *:nth-child(2) { animation-delay: 80ms; }
+  .stagger-in > *:nth-child(3) { animation-delay: 130ms; }
+  .stagger-in > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger-in > *:nth-child(5) { animation-delay: 230ms; }
+  .stagger-in > *:nth-child(6) { animation-delay: 280ms; }
+  .stagger-in > *:nth-child(7) { animation-delay: 330ms; }
+  .stagger-in > *:nth-child(8) { animation-delay: 380ms; }
+  .stagger-in > *:nth-child(9) { animation-delay: 430ms; }
+  .stagger-in > *:nth-child(10) { animation-delay: 480ms; }
+  .stagger-in > *:nth-child(n + 11) { animation-delay: 520ms; }
+
+  /* ==== Input focus scale glow ==== */
+  .ipt-glow {
+    transition: box-shadow 200ms ease, border-color 200ms ease,
+                transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .ipt-glow:focus {
+    transform: scale(1.005);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.18);
+  }
+
+  /* ==== Soft red shake for validation ==== */
+  .shake-err { animation: shakeSoft 360ms ease; }
+
+  /* ==== Pulse callout (hero badges) ==== */
+  .ring-pulse {
+    animation: pulseGlow 2.4s ease-out infinite;
+  }
+
+  /* Utility: Pop-in (modals, toasts) */
+  .pop-in { animation: popIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .slide-in-right { animation: slideInRight 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .spin-slow { animation: spinSlow 1.2s linear infinite; }
+
+  /* ========= Sweep gradient (TRÁI → PHẢI) khi hover =========
+     - Áp dụng cho banner / hero / card nền gradient xanh→cam / 2 màu.
+     - Nguyên tắc: background-size 220% 100% (hoặc 220% 220% nếu to-br)
+                   idle → background-position: 0% 50% (trái)
+                   hover → background-position: 100% 50% (phải)
+                   transition 1.1s cubic-bezier(.22,1,.36,1)
+     - Hover out = CSS tự return về 0% nhờ transition (không cần JS)
+  */
+
+  /* Banner / hero to-br = chéo (ảnh hưởng cả 2 trục X+Y) */
+  .gradient-sweep-br {
+    background-size: 240% 240%;
+    background-position: 0% 0%;
+    transition: background-position 1150ms cubic-bezier(0.22, 1, 0.36, 1),
+                filter 260ms ease,
+                transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: background-position;
+  }
+  .gradient-sweep-br:hover {
+    background-position: 100% 100%;
+    filter: saturate(1.1) brightness(1.03);
+  }
+
+  /* Nút / card ngang linear-gradient to-r (chỉ trục X) */
+  .gradient-sweep-x {
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+    transition: background-position 900ms cubic-bezier(0.22, 1, 0.36, 1),
+                transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                filter 200ms ease;
+    will-change: background-position;
+  }
+  .gradient-sweep-x:hover {
+    background-position: 100% 50%;
+    transform: translateY(-1.5px);
+    filter: brightness(1.05) saturate(1.08);
+  }
+  .gradient-sweep-x:active {
+    background-position: 40% 50%;
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Buttons trắng nền đặc - sweep màu xanh→cam nhẹ dưới dạng pseudo overlay */
+  .btn-sweep-white {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                color 260ms ease,
+                letter-spacing 260ms ease,
+                border-color 260ms ease,
+                background-color 260ms ease;
+  }
+  .btn-sweep-white::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      100deg,
+      rgba(37, 99, 235, 0.06) 0%,
+      rgba(37, 99, 235, 0.0) 20%,
+      rgba(249, 115, 22, 0.0) 80%,
+      rgba(249, 115, 22, 0.12) 100%
+    );
+    background-size: 280% 100%;
+    background-position: -60% 50%;
+    transition: background-position 950ms cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: -1;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  .btn-sweep-white::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      rgba(37, 99, 235, 0.00) 0%,
+      rgba(37, 99, 235, 0.08) 20%,
+      rgba(249, 115, 22, 0.10) 60%,
+      rgba(249, 115, 22, 0.00) 100%
+    );
+    background-size: 260% 100%;
+    background-position: -100% 50%;
+    transition: background-position 1050ms cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: -1;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  .btn-sweep-white:hover {
+    transform: translateY(-1.5px);
+    letter-spacing: 0.01em;
+  }
+  .btn-sweep-white:hover::before { background-position: 100% 50%; }
+  .btn-sweep-white:hover::after  { background-position: 100% 50%; }
+  .btn-sweep-white:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Buttons outline/xám đặc - sweep màu overlay nhẹ */
+  .btn-sweep-outline {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 260ms ease,
+                background-color 260ms ease,
+                color 260ms ease;
+  }
+  .btn-sweep-outline::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      100deg,
+      rgba(37, 99, 235, 0.10) 0%,
+      rgba(37, 99, 235, 0.00) 25%,
+      rgba(249, 115, 22, 0.00) 75%,
+      rgba(249, 115, 22, 0.18) 100%
+    );
+    background-size: 280% 100%;
+    background-position: -70% 50%;
+    transition: background-position 1000ms cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: -1;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  .btn-sweep-outline:hover {
+    transform: translateY(-1.5px);
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+  .btn-sweep-outline:hover::before { background-position: 100% 50%; }
+  .btn-sweep-outline:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+

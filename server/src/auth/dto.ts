@@ -1,9 +1,35 @@
 import { z } from 'zod'
 
+const emptyToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v)
+
 export const registerDto = z.object({
   name: z.string().min(1).describe('Họ tên hiển thị của user (tối thiểu 1 ký tự).'),
   email: z.string().email().describe('Email đăng ký tài khoản (định dạng RFC 5322).'),
   password: z.string().min(6).describe('Mật khẩu tài khoản (tối thiểu 6 ký tự).'),
+  phone: z
+    .preprocess(
+      emptyToNull,
+      z.string().min(7).max(20).nullable().optional(),
+    )
+    .describe('[Tùy chọn] Số điện thoại liên hệ khách hàng (7-20 ký tự, bỏ khoảng trắng/dấu gạch nối tự động được). Để trống / empty → null.'),
+  gender: z
+    .preprocess(
+      emptyToNull,
+      z.enum(['male', 'female', 'other']).nullable().optional(),
+    )
+    .describe('[Tùy chọn] Giới tính khách hàng (male=female / Nam / Nữ / Khác). Empty → null.'),
+  dateOfBirth: z
+    .preprocess(
+      emptyToNull,
+      z.string().min(8).max(20).nullable().optional(),
+    )
+    .describe('[Tùy chọn] Ngày sinh khách hàng (YYYY-MM-DD hoặc DD/MM/YYYY tùy format FE parse, hệ thống save text YYYY-MM-DD). Empty → null.'),
+  citizenId: z
+    .preprocess(
+      emptyToNull,
+      z.string().min(6).max(30).nullable().optional(),
+    )
+    .describe('[Tùy chọn] Số Căn cước công dân (CCCD) / CMND (6-30 ký tự). Empty → null.'),
 })
 
 export type RegisterDto = z.infer<typeof registerDto>

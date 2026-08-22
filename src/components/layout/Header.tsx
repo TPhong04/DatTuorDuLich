@@ -54,7 +54,7 @@ export default function Header() {
         items: [
           { label: 'Visa', to: '/services/visa' },
           { label: 'Vé máy bay', to: '/services/flight-ticket' },
-          { label: 'Thuê xe', to: '/services/car-rental' },
+          { label: 'Cho thuê xe', to: '/cho-thue-xe' },
         ],
       },
       { label: 'Tin tức', to: '/news' },
@@ -73,7 +73,7 @@ export default function Header() {
       { label: 'Tour đoàn', to: '/group-tour' },
       { label: 'Visa', to: '/services/visa' },
       { label: 'Vé máy bay', to: '/services/flight-ticket' },
-      { label: 'Thuê xe', to: '/services/car-rental' },
+      { label: 'Cho thuê xe', to: '/cho-thue-xe' },
       { label: 'Lịch KH', to: '/tours?view=departures' },
     ],
     [],

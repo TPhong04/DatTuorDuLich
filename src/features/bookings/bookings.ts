@@ -29,6 +29,18 @@ export type BookingSurchargeLine = {
   note: string | null
 }
 
+export type BookingVehicleRequest = {
+  enabled: boolean
+  vehicleType?: string | null
+  vehicleClass?: string | null
+  seatCountMin?: number | null
+  vehicleCount?: number
+  withDriver?: boolean
+  pickupLocation?: string | null
+  returnLocation?: string | null
+  notes?: string | null
+}
+
 export type BookingTourSnapshot = {
   title: string
   slug: string
@@ -64,6 +76,7 @@ export type Booking = {
   currency: 'VND'
   paymentMethod: BookingPaymentMethod
   paymentStatus: BookingPaymentStatus
+  vehicleRequest?: BookingVehicleRequest | null
   adminNote?: string | null
   createdBy?: string | null
   assignedStaffIds?: string[]
@@ -407,6 +420,7 @@ export type CreateBookingPayload = {
   surcharges: CreateBookingSurchargeInput[]
   paymentMethod: BookingPaymentMethod
   agreeTerms: boolean
+  vehicleRequest?: BookingVehicleRequest | null
 }
 
 export async function createPublicBooking(tourSlug: string, body: CreateBookingPayload) {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { Model } from 'mongoose'
+import { Model, Types } from 'mongoose'
 
 import { User, UserAddress, UserDocument, UserEmergencyContact } from './user.schema'
 import { UserRole } from './user-role'
@@ -186,5 +186,63 @@ export class UsersService {
 
     await this.userModel.updateOne({ _id: userId }, update).exec()
     return this.findById(userId)
+  }
+
+  async mergeBookingIntoCustomerProfileIfEmpty(
+    userId: string | Types.ObjectId,
+    booking: {
+      contact?: { name?: unknown; phone?: unknown; email?: unknown; address?: unknown } | null
+      passengers?: Array<{ fullName?: unknown; type?: string; birthDate?: unknown; gender?: unknown; idCard?: unknown } | null> | null
+    },
+  ): Promise<UserDocument | null> {
+    const uid = userId instanceof Types.ObjectId ? userId : new Types.ObjectId(String(userId))
+    const user = await this.findById(uid.toHexString())
+    if (!user) return null
+    if (user.role !== 'customer') return user
+    const patch: Record<string, unknown> = {}
+
+    const contactName = typeof booking?.contact?.name === 'string' ? booking.contact.name.trim() : ''
+    if (contactName && (!user.name || !user.name.trim() || /^Guest[- ]?\d+/i.test(user.name))) {
+      patch.name = contactName
+    }
+
+    const contactPhone = typeof booking?.contact?.phone === 'string' ? booking.contact.phone.trim() : ''
+    if (contactPhone && !user.phone) {
+      patch.phone = contactPhone
+    }
+
+    if (booking?.contact?.address && typeof booking.contact.address === 'string' && booking.contact.address.trim()) {
+      const addrEmpty = !user.address || (!user.address.line1 && !user.address.province && !user.address.district && !user.address.ward)
+      if (addrEmpty) {
+        patch.address = { line1: booking.contact.address.trim(), province: null, district: null, ward: null } satisfies UserAddress
+      }
+    }
+
+    const firstPassenger = Array.isArray(booking?.passengers) ? (booking.passengers.find((p) => p && (p.type || 'NL') === 'NL') || booking.passengers.find(Boolean)) : null
+    if (firstPassenger) {
+      const pg = firstPassenger.gender === 'male' || firstPassenger.gender === 'female' || firstPassenger.gender === 'other' ? firstPassenger.gender : null
+      if (pg && !user.gender) {
+        patch.gender = pg
+      }
+      if (firstPassenger.birthDate && !user.dateOfBirth) {
+        try {
+          const d = firstPassenger.birthDate instanceof Date ? firstPassenger.birthDate : new Date(firstPassenger.birthDate as any)
+          if (!Number.isNaN(d.getTime())) {
+            const y = d.getFullYear()
+            const m = String(d.getMonth() + 1).padStart(2, '0')
+            const da = String(d.getDate()).padStart(2, '0')
+            patch.dateOfBirth = `${y}-${m}-${da}`
+          }
+        } catch {}
+      }
+      const idc = typeof firstPassenger.idCard === 'string' ? firstPassenger.idCard.trim() : ''
+      if (idc && !user.citizenId) {
+        patch.citizenId = idc
+      }
+    }
+
+    if (Object.keys(patch).length === 0) return user
+    await this.userModel.updateOne({ _id: uid }, { $set: patch }).exec()
+    return this.findById(uid.toHexString())
   }
 }

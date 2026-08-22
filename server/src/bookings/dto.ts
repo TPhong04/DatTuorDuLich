@@ -168,6 +168,24 @@ export const createBookingDto = z
       .describe(
         '[Create Booking] Các dòng phụ thu / thêm dịch vụ (array surchargeLine). Mặc định [] (rỗng). System cộng dồn vào surchargeAmount rồi cộng vào totalAmount cuối booking.',
       ),
+    vehicleRequest: z
+      .object({
+        enabled: z.boolean().default(false),
+        vehicleType: z.string().max(80).nullish().default(null),
+        vehicleClass: z.string().max(80).nullish().default(null),
+        seatCountMin: z.coerce.number().int().min(1).max(60).nullish().default(null),
+        vehicleCount: z.coerce.number().int().min(1).max(20).optional().default(1),
+        withDriver: z.boolean().optional().default(true),
+        pickupLocation: z.string().max(400).nullish().default(null),
+        returnLocation: z.string().max(400).nullish().default(null),
+        notes: z.string().max(2000).nullish().default(null),
+      })
+      .nullable()
+      .optional()
+      .default(null)
+      .describe(
+        '[Luồng B - Thuê xe kèm Tour] Thông tin khách yêu cầu thuê xe kèm theo tour (nhân viên vận hành sẽ dựa trên đây tạo Hợp đồng thuê xe gắn bookingId).',
+      ),
     paymentMethod: bookingPaymentMethodSchema
       .default('hold')
       .describe(
