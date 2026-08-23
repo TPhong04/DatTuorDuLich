@@ -98,9 +98,9 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
 {/* ================= BANNER ================= */}
-<section className="group relative mx-auto w-full max-w-7.2xl overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md shadow-slate-900/5">
+<section className="group relative mx-auto w-full max-w-7xl overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md shadow-slate-900/5">
   <div
-    className="relative aspect-[16/8.9] w-full"
+    className="relative aspect-[21/9] max-h-[420px] w-full"
     onClick={() => {
       if (currentBanner) onBannerClick(currentBanner)
     }}
@@ -198,7 +198,7 @@ export default function HomePage() {
 </section>
 {/* ================= END BANNER ================= */}
 
-      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <section className="mx-auto w-full max-w-7xl rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 rounded-t-3xl bg-emerald-600 px-5 py-3 text-white">
           <div className="flex items-center gap-2 text-sm font-extrabold">
             <span>🔥 TOUR HOT GIỜ CHÓT</span>
@@ -233,27 +233,12 @@ export default function HomePage() {
               >
                 <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 ring-1 ring-inset ring-slate-200/70">
                   {t.coverImageUrl ? (
-                    <div className="relative h-full w-full">
-                      <img
-                        alt=""
-                        aria-hidden="true"
-                        className={cn(
-                          'absolute inset-0 h-full w-full',
-                          'scale-110 blur-2xl opacity-40 saturate-150',
-                          'object-cover',
-                        )}
-                        src={t.coverImageUrl}
-                      />
                       <img
                         alt={t.title}
-                        className={cn(
-                          'relative z-10 h-full w-full transition duration-500 ease-out group-hover:scale-[1.04]',
-                          'object-contain',
-                        )}
+                        className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
                         src={t.coverImageUrl}
                       />
-                    </div>
-                  ) : (
+                    ): (
                     <div className="flex h-full w-full items-center justify-center bg-slate-50 text-[11px] font-semibold text-slate-400 ring-1 ring-inset ring-slate-200">
                       [Chưa upload ảnh cover]
                     </div>

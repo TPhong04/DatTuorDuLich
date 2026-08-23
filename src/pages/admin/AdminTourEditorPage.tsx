@@ -773,13 +773,13 @@ export default function AdminTourEditorPage() {
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 p-4">
               <div className="text-sm font-semibold text-slate-900">Ảnh cover</div>
-              <div className="mt-3 aspect-[16/5] overflow-hidden rounded-2xl bg-slate-100">
-                {draft.coverImageUrl ? (
-                  <img alt="Cover" className="h-full w-full object-cover" src={draft.coverImageUrl} />
-                ) : (
-                  <div className="h-full w-full" />
-                )}
-              </div>
+                <div className="mt-3 max-h-[280px] overflow-hidden rounded-3xl bg-slate-100 flex items-center justify-center">
+                  {draft.coverImageUrl ? (
+                    <img alt="Cover" className="max-h-[380px] max-w-full rounded-2xl object-contain" src={draft.coverImageUrl} />
+                  ) : (
+                    <div className="h-40 w-full" />
+                  )}
+                </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <label className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full bg-orange-500 px-4 text-sm font-semibold text-white transition hover:bg-orange-600">
                   <input

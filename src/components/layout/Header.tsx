@@ -190,8 +190,8 @@ export default function Header() {
             {authed ? (
               <>
                 {user?.role === 'customer' && <NotificationBell />}
-                <Link className="inline-flex items-center" to="/account">
-                  <div className="relative h-10 w-10 overflow-hidden rounded-full ring-2 ring-orange-500">
+                <Link className="inline-flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition hover:bg-slate-100" to="/account">
+                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-2 ring-orange-500">
                     {user?.avatarUrl ? (
                       <img alt="Ảnh đại diện" className="h-full w-full object-cover" src={user.avatarUrl} />
                     ) : (
@@ -200,9 +200,12 @@ export default function Header() {
                       </div>
                     )}
                   </div>
+                  <span className="max-w-32 truncate text-sm font-semibold text-slate-900">
+                    {user?.name ?? 'Tài khoản'}
+                  </span>
                 </Link>
               </>
-            ) : (
+            )  : (
               <NavLink
                 className={({ isActive }) =>
                   cn(
