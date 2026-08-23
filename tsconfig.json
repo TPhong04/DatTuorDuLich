@@ -33,7 +33,5 @@
     "src",
     "api"
   ],
-  "references": [
-    { "path": "./server" }
-  ]
+
 }
