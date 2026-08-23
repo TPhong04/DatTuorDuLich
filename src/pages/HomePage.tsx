@@ -71,6 +71,19 @@ export default function HomePage() {
 
   const currentBanner = banners[bannerIndex] ?? null
 
+  // Gom coverImageUrl + imageUrls, loại bỏ giá trị rỗng/trùng lặp
+  const getTourImages = (tour: PublicTourCard): string[] => {
+    const images = [tour.coverImageUrl, ...(tour.imageUrls ?? [])]
+
+    return [
+      ...new Set(
+        images.filter(
+          (url): url is string => typeof url === 'string' && url.trim().length > 0,
+        ),
+      ),
+    ]
+  }
+
   const onBannerClick = (b: PublicBanner) => {
     if (b.targetType === 'none') return
     const to = b.targetValue
@@ -97,106 +110,106 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-{/* ================= BANNER ================= */}
-<section className="group relative mx-auto w-full max-w-7xl overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md shadow-slate-900/5">
-  <div
-    className="relative aspect-[21/9] max-h-[420px] w-full"
-    onClick={() => {
-      if (currentBanner) onBannerClick(currentBanner)
-    }}
-    role={currentBanner?.targetType !== 'none' && currentBanner?.targetValue ? 'button' : undefined}
-    tabIndex={currentBanner?.targetType !== 'none' && currentBanner?.targetValue ? 0 : -1}
-  >
-    {bannersLoading && !banners.length && !bannersError ? (
-      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200" />
-    ) : bannersError ? (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-amber-50 px-6 text-center ring-1 ring-inset ring-amber-200">
-        <div className="text-sm font-bold text-amber-900">⚠️ Không tải được Banner (lỗi kết nối server)</div>
-        <div className="text-xs font-semibold text-amber-800/80 break-all max-w-2xl">{bannersError}</div>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-1 inline-flex h-9 items-center justify-center rounded-full bg-amber-500 px-4 text-xs font-semibold text-white hover:bg-amber-600 shadow-sm shadow-amber-500/20"
-          type="button"
+      {/* ================= BANNER ================= */}
+      <section className="group relative mx-auto w-full max-w-7xl overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md shadow-slate-900/5">
+        <div
+          className="relative aspect-[21/9] max-h-[420px] w-full"
+          onClick={() => {
+            if (currentBanner) onBannerClick(currentBanner)
+          }}
+          role={currentBanner?.targetType !== 'none' && currentBanner?.targetValue ? 'button' : undefined}
+          tabIndex={currentBanner?.targetType !== 'none' && currentBanner?.targetValue ? 0 : -1}
         >
-          ↻ Tải lại trang
-        </button>
-      </div>
-    ) : currentBanner?.imageUrl ? (
-      <>
-        {/* object-cover: ảnh tự phóng to lấp đầy khung theo chiều ngang, crop bớt phần
-            viền mờ trang trí hai bên (nếu có) trong file ảnh gốc, chỉ giữ phần nội dung
-            chính giữa. Khung có tỉ lệ cố định (aspect-[21/9]) để hiển thị đồng đều giữa
-            các banner có kích thước khác nhau. */}
-        <img
-          key={currentBanner.id}
-          alt={currentBanner.title ?? 'Banner'}
-          className="absolute inset-0 block h-full w-full animate-[fadeSlideIn_0.5s_ease-out] object-cover object-center"
-          src={currentBanner.imageUrl}
-        />
-        {/* Gradient nhẹ phía dưới để nút/chỉ báo luôn nổi bật */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-black/40 to-transparent" />
-      </>
-    ) : (
-      <div className="absolute inset-0 flex items-center justify-center gap-3 bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-6 ring-1 ring-inset ring-slate-200">
-        <div className="text-center">
-          <div className="text-2xl font-extrabold text-slate-900 tracking-tight">✨ Chào mừng đến với hệ thống Tour Du lịch</div>
-          <div className="mt-2 text-sm text-slate-600">Vào phần <b className="text-orange-600">Admin → Banners</b> để tải banner khuyến mãi lên trang chủ.</div>
+          {bannersLoading && !banners.length && !bannersError ? (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200" />
+          ) : bannersError ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-amber-50 px-6 text-center ring-1 ring-inset ring-amber-200">
+              <div className="text-sm font-bold text-amber-900">⚠️ Không tải được Banner (lỗi kết nối server)</div>
+              <div className="text-xs font-semibold text-amber-800/80 break-all max-w-2xl">{bannersError}</div>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-1 inline-flex h-9 items-center justify-center rounded-full bg-amber-500 px-4 text-xs font-semibold text-white hover:bg-amber-600 shadow-sm shadow-amber-500/20"
+                type="button"
+              >
+                ↻ Tải lại trang
+              </button>
+            </div>
+          ) : currentBanner?.imageUrl ? (
+            <>
+              {/* object-cover: ảnh tự phóng to lấp đầy khung theo chiều ngang, crop bớt phần
+                  viền mờ trang trí hai bên (nếu có) trong file ảnh gốc, chỉ giữ phần nội dung
+                  chính giữa. Khung có tỉ lệ cố định (aspect-[21/9]) để hiển thị đồng đều giữa
+                  các banner có kích thước khác nhau. */}
+              <img
+                key={currentBanner.id}
+                alt={currentBanner.title ?? 'Banner'}
+                className="absolute inset-0 block h-full w-full animate-[fadeSlideIn_0.5s_ease-out] object-cover object-center"
+                src={currentBanner.imageUrl}
+              />
+              {/* Gradient nhẹ phía dưới để nút/chỉ báo luôn nổi bật */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-black/40 to-transparent" />
+            </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center gap-3 bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-6 ring-1 ring-inset ring-slate-200">
+              <div className="text-center">
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight">✨ Chào mừng đến với hệ thống Tour Du lịch</div>
+                <div className="mt-2 text-sm text-slate-600">Vào phần <b className="text-orange-600">Admin → Banners</b> để tải banner khuyến mãi lên trang chủ.</div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    )}
-  </div>
 
-  {/* Nút điều hướng trái/phải, chỉ hiện khi hover và có >1 banner */}
-  {banners.length > 1 ? (
-    <>
-      <button
-        aria-label="Banner trước"
-        onClick={(e) => {
-          e.stopPropagation()
-          goPrev()
-        }}
-        className="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-700 opacity-0 shadow-md backdrop-blur transition hover:bg-white group-hover:opacity-100"
-        type="button"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 010 1.06L9.06 10l3.73 3.71a.75.75 0 11-1.06 1.06l-4.25-4.25a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0z" clipRule="evenodd" />
-        </svg>
-      </button>
-      <button
-        aria-label="Banner sau"
-        onClick={(e) => {
-          e.stopPropagation()
-          goNext()
-        }}
-        className="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-700 opacity-0 shadow-md backdrop-blur transition hover:bg-white group-hover:opacity-100"
-        type="button"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 010-1.06L10.94 10 7.21 6.29a.75.75 0 111.06-1.06l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0z" clipRule="evenodd" />
-        </svg>
-      </button>
+        {/* Nút điều hướng trái/phải, chỉ hiện khi hover và có >1 banner */}
+        {banners.length > 1 ? (
+          <>
+            <button
+              aria-label="Banner trước"
+              onClick={(e) => {
+                e.stopPropagation()
+                goPrev()
+              }}
+              className="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-700 opacity-0 shadow-md backdrop-blur transition hover:bg-white group-hover:opacity-100"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 010 1.06L9.06 10l3.73 3.71a.75.75 0 11-1.06 1.06l-4.25-4.25a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <button
+              aria-label="Banner sau"
+              onClick={(e) => {
+                e.stopPropagation()
+                goNext()
+              }}
+              className="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/80 p-2 text-slate-700 opacity-0 shadow-md backdrop-blur transition hover:bg-white group-hover:opacity-100"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 010-1.06L10.94 10 7.21 6.29a.75.75 0 111.06-1.06l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0z" clipRule="evenodd" />
+              </svg>
+            </button>
 
-      <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
-        {banners.map((b, i) => (
-          <button
-            aria-label={`Banner ${i + 1}`}
-            className={cn(
-              'h-2 rounded-full shadow-sm transition-all duration-300',
-              i === bannerIndex ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/80',
-            )}
-            key={b.id}
-            onClick={(e) => {
-              e.stopPropagation()
-              setBannerIndex(i)
-            }}
-            type="button"
-          />
-        ))}
-      </div>
-    </>
-  ) : null}
-</section>
-{/* ================= END BANNER ================= */}
+            <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+              {banners.map((b, i) => (
+                <button
+                  aria-label={`Banner ${i + 1}`}
+                  className={cn(
+                    'h-2 rounded-full shadow-sm transition-all duration-300',
+                    i === bannerIndex ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/80',
+                  )}
+                  key={b.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setBannerIndex(i)
+                  }}
+                  type="button"
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
+      </section>
+      {/* ================= END BANNER ================= */}
 
       <section className="mx-auto w-full max-w-7xl rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 rounded-t-3xl bg-emerald-600 px-5 py-3 text-white">
@@ -232,28 +245,48 @@ export default function HomePage() {
                 type="button"
               >
                 <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 ring-1 ring-inset ring-slate-200/70">
-                  {t.imageUrls?.length ? (
-                    <div className="grid h-full w-full grid-cols-2 gap-1">
-                      {t.imageUrls.slice(0, 4).map((image, index) => (
+                  {(() => {
+                    const images = getTourImages(t)
+
+                    if (images.length === 0) {
+                      return (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-50 text-[11px] font-semibold text-slate-400">
+                          [Chưa upload ảnh]
+                        </div>
+                      )
+                    }
+
+                    if (images.length === 1) {
+                      return (
                         <img
-                          key={`${t.id}-${index}`}
-                          src={image}
-                          alt={`${t.title} - ảnh ${index + 1}`}
-                          className="h-full w-full object-cover"
+                          alt={t.title}
+                          className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+                          src={images[0]}
                         />
-                      ))}
-                    </div>
-                  ) : t.coverImageUrl ? (
-                    <img
-                      alt={t.title}
-                      src={t.coverImageUrl}
-                      className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-50 text-[11px] font-semibold text-slate-400">
-                      [Chưa upload ảnh cover]
-                    </div>
-                  )}
+                      )
+                    }
+
+                    return (
+                      <div className="grid h-full w-full grid-cols-2 gap-1">
+                        {images.slice(0, 4).map((image, index) => (
+                          <div className="relative min-h-0 overflow-hidden" key={`${t.id}-image-${index}`}>
+                            <img
+                              alt={`${t.title} - ảnh ${index + 1}`}
+                              className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+                              loading="lazy"
+                              src={image}
+                            />
+                            {index === 3 && images.length > 4 ? (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                                <span className="text-lg font-extrabold text-white">+{images.length - 4}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+
                   {discount ? (
                     <span className="absolute left-3 top-3 z-20 inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-md shadow-orange-500/30 ring-1 ring-inset ring-white/20">
                       -{discount}%
