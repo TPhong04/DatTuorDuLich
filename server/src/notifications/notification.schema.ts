@@ -38,6 +38,13 @@ export type NotificationType =
   | 'system_info'
   | 'rental_inquiry_confirmed'
   | 'admin_rental_inquiry_confirmed'
+  | 'chat_escalated'
+  | 'chat_assigned_staff'
+  | 'chat_new_customer_message'
+  | 'chat_new_staff_message'
+  | 'chat_sla_breached'
+  | 'chat_auto_closed'
+  | 'chat_rating_received'
 
 @Schema({ timestamps: true, collection: 'notifications' })
 export class Notification {

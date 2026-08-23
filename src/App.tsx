@@ -66,6 +66,8 @@ import StaffNotificationsPage from '@/pages/staff/StaffNotificationsPage'
 import StaffToursPage from '@/pages/staff/StaffToursPage'
 import StaffVehiclesPage from '@/pages/staff/StaffVehiclesPage'
 import StaffRentalsPage from '@/pages/staff/StaffRentalsPage'
+import AdminChatListPage from '@/pages/admin/AdminChatListPage'
+import AdminChatDetailPage from '@/pages/admin/AdminChatDetailPage'
 
 function BookingPublicRoute() {
   const { slug } = useParams<{ slug: string }>()
@@ -130,6 +132,8 @@ export default function App() {
               <Route path="group-tour-requests" element={<StaffGroupTourRequestsPage />} />
               <Route path="content/posts" element={<AdminContentPostsPage />} />
               <Route path="content/reviews" element={<StaffContentReviewsPage />} />
+              <Route path="inbox" element={<AdminChatListPage />} />
+              <Route path="inbox/:id" element={<AdminChatDetailPage />} />
             </Route>
           </Route>
 
@@ -152,6 +156,8 @@ export default function App() {
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="audit-logs" element={<AdminAuditLogsPage />} />
               <Route path="reports" element={<AdminReportsPage />} />
+              <Route path="customer-chat" element={<AdminChatListPage />} />
+              <Route path="customer-chat/:id" element={<AdminChatDetailPage />} />
               <Route path="settings" element={<AdminSettingsLayout />}>
                 <Route index element={<AdminSettingsIndexPage />} />
                 <Route path="company" element={<AdminSettingsCompanyPage />} />

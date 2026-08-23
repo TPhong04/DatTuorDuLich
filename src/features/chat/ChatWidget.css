@@ -55,9 +55,17 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.15);
 }
+.chat-status--bot { background: rgba(255,255,255,0.2); }
+.chat-status--escalated { background: #e08a3c; }
+.chat-status--staff { background: #10b981; color:#0b4b37; font-weight:600; }
+.chat-status--closed { background: #6b7280; }
 
-.chat-status--escalated {
-  background: #e08a3c;
+.chat-escalation-note {
+  background: #fff7ed;
+  border-bottom: 1px solid #fed7aa;
+  color: #9a3412;
+  padding: 8px 14px;
+  font-size: 12.5px;
 }
 
 .chat-close {
@@ -109,6 +117,14 @@
   align-self: flex-start;
   background: #fff;
   border: 1px solid #e2ddd0;
+  border-bottom-left-radius: 3px;
+}
+
+.chat-bubble--staff {
+  align-self: flex-start;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
   border-bottom-left-radius: 3px;
 }
 

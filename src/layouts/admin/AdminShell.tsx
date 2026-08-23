@@ -13,6 +13,7 @@ import {
   Key,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
   MessageSquareHeart,
   ShieldCheck,
   Users,
@@ -83,6 +84,7 @@ export default function AdminShell() {
         { label: 'Quản lý xe', to: '/admin/vehicles', icon: <Car className="h-4 w-4" /> },
         { label: 'Cho thuê xe', to: '/admin/rentals', icon: <Key className="h-4 w-4" /> },
         { label: 'Tour đoàn', to: '/admin/group-tour-requests', icon: <FileText className="h-4 w-4" /> },
+        { label: 'Hỗ trợ khách hàng', to: '/admin/customer-chat', icon: <MessageSquare className="h-4 w-4" /> },
       ],
     },
     {

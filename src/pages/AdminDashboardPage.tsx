@@ -5,13 +5,16 @@ import {
   BookOpenCheck,
   CalendarDays,
   CircleDot,
+  Clock,
   ClipboardList,
   Flag,
+  MessageCircle,
   RefreshCcw,
   Search,
   Sparkles,
   TrendingUp,
   Users2,
+  UsersRound,
   Wallet,
 } from 'lucide-react'
 
@@ -31,6 +34,10 @@ import {
   DashboardSummary,
   fetchAdminDashboardSummary,
 } from '@/features/bookings/bookings'
+import {
+  ChatStats,
+  adminChatDashboardStats,
+} from '@/features/chat/chat'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/utils/date'
 import { formatInt, formatMoney, formatVNDShort } from '@/utils/format'
@@ -71,17 +78,26 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<DashboardSummary | null>(null)
+  const [chatStats, setChatStats] = useState<ChatStats | null>(null)
+  const [chatLoading, setChatLoading] = useState(true)
 
   const refresh = () => {
     setLoading(true)
     setError(null)
-    fetchAdminDashboardSummary()
-      .then((r) => setData(r))
-      .catch((e) => {
-        setError(e?.message || 'Không thể tải dashboard')
-        setData(null)
-      })
-      .finally(() => setLoading(false))
+    setChatLoading(true)
+    Promise.all([
+      fetchAdminDashboardSummary()
+        .then((r) => setData(r))
+        .catch((e) => {
+          setError(e?.message || 'Không thể tải dashboard')
+          setData(null)
+        })
+        .finally(() => setLoading(false)),
+      adminChatDashboardStats()
+        .then((r) => setChatStats(r))
+        .catch(() => setChatStats(null))
+        .finally(() => setChatLoading(false)),
+    ])
   }
 
   useEffect(() => {
@@ -220,6 +236,102 @@ export default function AdminDashboardPage() {
           icon={<TrendingUp className="h-6 w-6" />}
           onClick={() => (window.location.href = '/admin/bookings?status=pending')}
         />
+      </div>
+
+      {/* Chat CS Chat CS Chat */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 2xl:gap-7 xl:grid-cols-4">
+        <KpiCard
+          label="💬 Chat Chờ nhân viên"
+          value={formatInt(chatStats?.pendingPickup ?? 0)}
+          sub={chatLoading ? 'Đang đồng bộ' : (chatStats && chatStats.breachedToday > 0 ? `⚠ ${chatStats.breachedToday} đã quá hạn SLA` : 'SLA OK')}
+          tone={(chatStats?.pendingPickup ?? 0) > 0 ? 'rose' : 'blue'}
+          icon={<MessageCircle className="h-6 w-6" />}
+          onClick={() => (window.location.href = '/admin/customer-chat?onlyUnassigned=1')}
+        />
+        <KpiCard
+          label="💬 Đang xử lý"
+          value={formatInt(chatStats?.inProgress ?? 0)}
+          sub={chatLoading ? 'Đang đồng bộ' : 'Chat đang xử lý (đã giao nhân viên)'}
+          tone="blue"
+          icon={<UsersRound className="h-6 w-6" />}
+          onClick={() => (window.location.href = '/admin/customer-chat?status=ESCALATED')}
+        />
+        <KpiCard
+          label="💬 Đã đóng hôm nay"
+          value={formatInt(chatStats?.todayClosed ?? 0)}
+          sub={chatLoading ? 'Đang đồng bộ' : `Tổng ${chatStats?.total ?? 0} phiên trong hệ thống`}
+          tone="emerald"
+          icon={<BookOpenCheck className="h-6 w-6" />}
+          onClick={() => (window.location.href = '/admin/customer-chat?status=CLOSED')}
+        />
+        <KpiCard
+          label="⏱ Phản hồi đầu TB"
+          value={chatStats?.avgFirstResponseHuman || '—'}
+          sub={chatLoading ? 'Đang đồng bộ' : (chatStats?.avgRating ? `⭐ TB ${chatStats.avgRating.toFixed(1)} sao (${chatStats.ratedCount} đánh giá)` : 'Chưa có đánh giá')}
+          tone="orange"
+          icon={<Clock className="h-6 w-6" />}
+          onClick={() => (window.location.href = '/admin/reports')}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-6 2xl:gap-7 xl:grid-cols-12">
+        <Card className="xl:col-span-7 !p-6 2xl:!p-8">
+          <SectionTitle title="🏆 Top Nhân viên Chăm sóc KH (Hôm nay)" subtitle="Dựa trên số phiên chat đã đóng trong ngày (ngày hiện tại)" />
+          {!chatLoading && chatStats && chatStats.topStaff && chatStats.topStaff.length > 0 ? (
+            <div className="mt-5 grid grid-cols-1 divide-y divide-slate-200 border-y">
+              {chatStats.topStaff.slice(0, 6).map((s, i) => (
+                <div key={s.staffId} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      'flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm',
+                      i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : i === 2 ? 'bg-orange-400' : 'bg-slate-300 text-slate-700'
+                    )}>
+                      {i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-800">👤 {s.staffName || s.staffId?.slice(-6)}</div>
+                      <div className="text-xs text-slate-500">Mã NV: {s.staffId}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xl font-black text-emerald-700">{s.closed} phiên</div>
+                    <Link to={`/admin/customer-chat?assignedTo=${s.staffId}`} className="text-xs text-teal-700 underline">Xem các cuộc chat →</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-8 text-center text-sm text-slate-500">
+            {chatLoading ? 'Đang tải dữ liệu nhân viên...' : 'Chưa có nhân viên nào đóng chat trong hôm nay'}
+          </div>
+          )}
+        </Card>
+        <Card className="xl:col-span-5 !p-6 2xl:!p-8">
+          <SectionTitle title="📊 Tình hình CS Chat" subtitle="SLA & Đánh giá" />
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl ring-1 ring-inset ring-slate-200 bg-white p-4 text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">SLA quá hạn hôm nay</div>
+              <div className={cn('mt-1 text-2xl font-black', (chatStats?.breachedToday ?? 0) > 0 ? 'text-rose-600' : 'text-emerald-700')}>{chatStats?.breachedToday ?? 0}</div>
+              <div className="text-[11px] text-slate-500">phiên</div>
+            </div>
+            <div className="rounded-xl ring-1 ring-inset ring-slate-200 bg-white p-4 text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Đánh giá ⭐ TB</div>
+              <div className="mt-1 text-2xl font-black text-amber-600">{chatStats?.avgRating ? chatStats.avgRating.toFixed(1) : '—'}</div>
+              <div className="text-[11px] text-slate-500">{chatStats?.ratedCount ?? 0} đánh giá</div>
+            </div>
+            <div className="rounded-xl ring-1 ring-inset ring-slate-200 bg-white p-4 text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Tổng phiên chat</div>
+              <div className="mt-1 text-2xl font-black text-slate-800">{formatInt(chatStats?.total ?? 0)}</div>
+              <div className="text-[11px] text-slate-500">tất cả</div>
+            </div>
+            <div className="rounded-xl ring-1 ring-inset ring-slate-200 bg-white p-4 text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Khoảng thời gian</div>
+              <div className="mt-1 text-xs font-semibold text-slate-800 break-words">
+                {chatStats?.range?.from ? `${formatDate(chatStats.range.from)} → ${chatStats?.range?.to ? formatDate(chatStats.range.to) : ''}` : '—'}
+              </div>
+              <div className="text-[11px] text-slate-500">thống kê</div>
+            </div>
+          </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-6 2xl:gap-7 xl:grid-cols-12">

@@ -9,7 +9,7 @@ export default function PageHeader({
   className,
 }: {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   right?: ReactNode
   className?: string
 }) {
@@ -29,7 +29,7 @@ export default function PageHeader({
           </div>
           <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-indigo-800 via-blue-700 to-orange-600 bg-clip-text text-transparent md:text-2xl">{title}</h1>
         </div>
-        {subtitle ? <p className="mt-2 pl-4 text-sm text-slate-600">{subtitle}</p> : null}
+        {subtitle ? <div className="mt-2 pl-4 text-sm text-slate-600">{subtitle}</div> : null}
       </div>
       {right ? (
         <div className="mt-4 flex w-full shrink-0 items-center justify-end gap-2 md:mt-0 md:w-auto md:max-w-[45%]">
