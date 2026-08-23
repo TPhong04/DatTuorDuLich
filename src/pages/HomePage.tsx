@@ -232,14 +232,25 @@ export default function HomePage() {
                 type="button"
               >
                 <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 ring-1 ring-inset ring-slate-200/70">
-                  {t.coverImageUrl ? (
-                      <img
-                        alt={t.title}
-                        className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
-                        src={t.coverImageUrl}
-                      />
-                    ): (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-50 text-[11px] font-semibold text-slate-400 ring-1 ring-inset ring-slate-200">
+                  {t.imageUrls?.length ? (
+                    <div className="grid h-full w-full grid-cols-2 gap-1">
+                      {t.imageUrls.slice(0, 4).map((image, index) => (
+                        <img
+                          key={`${t.id}-${index}`}
+                          src={image}
+                          alt={`${t.title} - ảnh ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : t.coverImageUrl ? (
+                    <img
+                      alt={t.title}
+                      src={t.coverImageUrl}
+                      className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-slate-50 text-[11px] font-semibold text-slate-400">
                       [Chưa upload ảnh cover]
                     </div>
                   )}
