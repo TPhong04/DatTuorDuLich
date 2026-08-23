@@ -26,6 +26,10 @@ function toPublicTourCard(t: any) {
     transportText: t.transportText ?? null,
     hotelText: t.hotelText ?? null,
     coverImageUrl: t.coverImageUrl ?? null,
+    // Gộp toàn bộ ảnh gallery của tour để FE hiển thị lưới nhiều ảnh trên card,
+    // không chỉ mỗi ảnh cover. Dữ liệu gốc nằm ở field galleryImageUrls trong DB
+    // (giống mục "Gallery" trong trang Admin sửa tour).
+    imageUrls: Array.isArray(t.galleryImageUrls) ? t.galleryImageUrls : [],
     highlights: Array.isArray(t.highlights) ? t.highlights : [],
     tags: Array.isArray(t.tags) ? t.tags : [],
     totalBookings: typeof t.totalBookings === 'number' ? t.totalBookings : 0,
@@ -156,6 +160,7 @@ export class ToursController {
               transportText: { type: 'string', nullable: true, example: 'Xe limousine 9 chỗ + Du thuyền' },
               hotelText: { type: 'string', nullable: true, example: 'Ở du thuyền cabin biển hướng' },
               coverImageUrl: { type: 'string', nullable: true, example: '/uploads/tours/halong-cover.jpg' },
+              imageUrls: { type: 'array', items: { type: 'string' }, example: ['/uploads/tours/halong-1.jpg', '/uploads/tours/halong-2.jpg'] },
               highlights: { type: 'array', items: { type: 'string' }, example: ['Cảnh quan Vịnh Hạ Long di sản', 'Du thuyền 5 sao', 'Kayak hang Sửng Sốt'] },
               tags: { type: 'array', items: { type: 'string' }, example: ['biển', 'vinh-di-san', 'di-san-thien-nhien'] },
               totalBookings: { type: 'number', example: 1247 },
