@@ -1,4 +1,4 @@
-import { apiFetch, ensureCsrfTokenForStateChanging, refreshAccessToken } from '@/lib/api'
+import { apiFetch, apiUrl, ensureCsrfTokenForStateChanging, refreshAccessToken } from '@/lib/api'
 import { clearStoredAuthRaw, getStoredAccessToken } from '@/features/auth/auth.storage'
 
 export type AdminUserRole = 'customer' | 'staff' | 'admin'
@@ -278,7 +278,7 @@ export async function adminUploadImage(input: { file: File; category: string }) 
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`
     if (csrf) headers['X-XSRF-TOKEN'] = csrf
 
-    const res = await fetch(`/api/admin/uploads/image?category=${encodeURIComponent(input.category)}`, {
+    const res = await fetch(apiUrl(`/api/admin/uploads/image?category=${encodeURIComponent(input.category)}`), {
       method: 'POST',
       body: form,
       credentials: 'include',

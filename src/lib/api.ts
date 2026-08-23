@@ -20,7 +20,7 @@ const API_TARGET = String(
   env.VITE_API_TARGET || 'https://dattuordulich-be.onrender.com'
 ).replace(/\/+$/, '')
 
-function apiUrl(path: string): string {
+export function apiUrl(path: string): string {
   return `${API_TARGET}${path.startsWith('/') ? path : `/${path}`}`
 }
 
