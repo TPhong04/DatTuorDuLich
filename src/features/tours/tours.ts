@@ -1,5 +1,4 @@
 import { apiFetch } from '@/lib/api'
-
 export type PublicTourCard = {
   id: string
   title: string
@@ -15,6 +14,7 @@ export type PublicTourCard = {
   transportText: string | null
   hotelText: string | null
   coverImageUrl: string | null
+  imageUrls?: string[]
   highlights: string[]
   tags: string[]
   totalBookings: number
@@ -31,9 +31,7 @@ export type PublicTourCard = {
   seatsAvailable: number | null
   isPublished: boolean
 }
-
 export type PublicTourPriceRow = { label: string; amount: number }
-
 export type PublicTourItineraryDay = {
   label: string
   title: string
@@ -42,7 +40,6 @@ export type PublicTourItineraryDay = {
   attractions: string[]
   accommodationText: string | null
 }
-
 export type PublicTourDepartureStatus = 'open' | 'closed' | 'cancelled' | 'soldout'
 export type PublicTourDeparture = {
   id: string | null
@@ -66,7 +63,6 @@ export type PublicTourSeo = {
   canonicalUrl: string | null
   ogImageUrl: string | null
 }
-
 export type PublicTourReview = {
   name: string
   rating: number
@@ -74,7 +70,6 @@ export type PublicTourReview = {
   imageUrls: string[]
   createdAt: string | null
 }
-
 export type PublicTourDetail = PublicTourCard & {
   galleryImageUrls: string[]
   summary: string | null
@@ -95,7 +90,6 @@ export type PublicTourDetail = PublicTourCard & {
   pickupPoints: { address: string; time: string | null; note: string | null }[]
   reviews: PublicTourReview[]
 }
-
 export async function getPublicTours(params?: { q?: string; region?: string; tag?: string; transport?: string; view?: string }) {
   const qs = new URLSearchParams()
   if (params?.q) qs.set('q', params.q)
@@ -106,12 +100,10 @@ export async function getPublicTours(params?: { q?: string; region?: string; tag
   const qStr = qs.toString()
   return apiFetch<{ items: PublicTourCard[] }>(qStr ? `/tours?${qStr}` : '/tours')
 }
-
 export async function getPublicTour(slug: string) {
   const payload = await apiFetch<{ tour: PublicTourDetail; related: PublicTourCard[] }>(`/tours/${encodeURIComponent(slug)}`)
   return payload
 }
-
 export type PublicCreateReviewPayload = {
   name: string
   email?: string
@@ -120,7 +112,6 @@ export type PublicCreateReviewPayload = {
   content: string
   imageUrls?: string[]
 }
-
 export async function postPublicTourReview(slug: string, body: PublicCreateReviewPayload) {
   const res = await apiFetch<{ ok: boolean; message: string; approvedCount: number; avgRating: number | null }>(
     `/tours/${encodeURIComponent(slug)}/reviews`,
@@ -128,4 +119,3 @@ export async function postPublicTourReview(slug: string, body: PublicCreateRevie
   )
   return res
 }
-
