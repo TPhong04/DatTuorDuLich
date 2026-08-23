@@ -1,17 +1,16 @@
 import { BadRequestException, Controller, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { diskStorage } from 'multer'
-import sharp from 'sharp'
-import { randomBytes } from 'node:crypto'
-import { extname, join } from 'node:path'
-import { mkdirSync, writeFileSync } from 'node:fs'
 
+import sharp from 'sharp'
+import { extname } from 'node:path'
+import multer from 'multer'
 import { JwtPayload } from '../auth/auth.types'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { AccessTokenGuard } from '../auth/guards/access-token.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { AuditLogsService } from '../audit-logs/audit-logs.service'
+import { CloudinaryService } from '../cloudinary/cloudinary.service'
 
 function safeCategory(input: unknown) {
   const raw = typeof input === 'string' ? input.trim().toLowerCase() : ''
@@ -25,12 +24,12 @@ function fileExt(input: string) {
   return ''
 }
 
-async function processBannerImageToHero(inputPath: string, ext: string) {
+async function processBannerImageToHero(input: Buffer, ext: string): Promise<Buffer> {
   const targetW = 1920
   const targetH = 600
   const targetRatio = targetW / targetH
 
-  const src = sharp(inputPath).rotate()
+  const src = sharp(input).rotate()
   const meta = await src.metadata().catch(() => null)
   const ratio = meta?.width && meta?.height ? meta.width / meta.height : null
 
@@ -50,56 +49,40 @@ async function processBannerImageToHero(inputPath: string, ext: string) {
     base = src.resize(targetW, targetH, { fit: 'cover', position: 'centre' })
   }
 
-  const pipeline =
-    ext === '.jpg' || ext === '.jpeg'
-      ? base.jpeg({ quality: 82 })
-      : ext === '.png'
-        ? base.png({ compressionLevel: 9 })
-        : base.webp({ quality: 82 })
-
-  writeFileSync(inputPath, await pipeline.toBuffer())
+  return ext === '.jpg' || ext === '.jpeg'
+    ? base.jpeg({ quality: 82 }).toBuffer()
+    : ext === '.png'
+      ? base.png({ compressionLevel: 9 }).toBuffer()
+      : base.webp({ quality: 82 }).toBuffer()
 }
 
-async function processTourImageToCard(inputPath: string, ext: string) {
+async function processTourImageToCard(input: Buffer, ext: string): Promise<Buffer> {
   const targetW = 1200
   const targetH = 675
 
-  const src = sharp(inputPath).rotate()
+  const src = sharp(input).rotate()
   const base = src.resize(targetW, targetH, { fit: 'cover', position: 'centre' })
 
-  const pipeline =
-    ext === '.jpg' || ext === '.jpeg'
-      ? base.jpeg({ quality: 85 })
-      : ext === '.png'
-        ? base.png({ compressionLevel: 9 })
-        : base.webp({ quality: 85 })
-
-  writeFileSync(inputPath, await pipeline.toBuffer())
+  return ext === '.jpg' || ext === '.jpeg'
+    ? base.jpeg({ quality: 85 }).toBuffer()
+    : ext === '.png'
+      ? base.png({ compressionLevel: 9 }).toBuffer()
+      : base.webp({ quality: 85 }).toBuffer()
 }
 
 @Controller('admin/uploads')
 @UseGuards(AccessTokenGuard, RolesGuard)
 @Roles('admin')
 export class AdminUploadsController {
-  constructor(private readonly auditLogs: AuditLogsService) {}
+  constructor(
+    private readonly auditLogs: AuditLogsService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Post('image')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req: any, _file: any, cb: any) => {
-          const category = safeCategory((req as any)?.query?.category)
-          const dest = join(process.cwd(), 'uploads', category)
-          mkdirSync(dest, { recursive: true })
-          cb(null, dest)
-        },
-        filename: (_req: any, file: any, cb: any) => {
-          const ext = fileExt(file.originalname)
-          if (!ext) return cb(new Error('Invalid file'), '')
-          const name = `${Date.now()}_${randomBytes(8).toString('hex')}${ext}`
-          cb(null, name)
-        },
-      }),
+      storage: (multer as any).memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req: any, file: any, cb: any) => {
         const ext = fileExt(file.originalname)
@@ -114,24 +97,20 @@ export class AdminUploadsController {
   ) {
     if (!file) throw new BadRequestException('Thiếu file')
     const cat = safeCategory(category)
-    if (cat === 'banners') {
-      try {
-        const ext = fileExt(file.filename)
-        const path = join(process.cwd(), 'uploads', cat, file.filename)
-        await processBannerImageToHero(path, ext || '.jpg')
-      } catch {
-        throw new BadRequestException('Không xử lý được ảnh banner. Vui lòng thử ảnh khác.')
+    const ext = fileExt(file.originalname) || '.jpg'
+
+    let buffer: Buffer = file.buffer
+    try {
+      if (cat === 'banners') {
+        buffer = await processBannerImageToHero(buffer, ext)
+      } else if (cat === 'tours') {
+        buffer = await processTourImageToCard(buffer, ext)
       }
-    } else if (cat === 'tours') {
-      try {
-        const ext = fileExt(file.filename)
-        const path = join(process.cwd(), 'uploads', cat, file.filename)
-        await processTourImageToCard(path, ext || '.jpg')
-      } catch {
-        throw new BadRequestException('Không xử lý được ảnh tour. Vui lòng thử ảnh khác.')
-      }
+    } catch {
+      throw new BadRequestException('Không xử lý được ảnh. Vui lòng thử ảnh khác.')
     }
-    const url = `/uploads/${cat}/${file.filename}`
+
+    const { url } = await this.cloudinary.uploadBuffer(buffer, cat)
 
     await this.auditLogs.create({
       actorUserId: actor.sub,

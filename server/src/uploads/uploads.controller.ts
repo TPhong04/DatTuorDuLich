@@ -1,14 +1,13 @@
 import { BadRequestException, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { diskStorage } from 'multer'
-import { mkdirSync } from 'node:fs'
-import { randomBytes } from 'node:crypto'
-import { extname, join } from 'node:path'
+import multer from 'multer'
+import { extname } from 'node:path'
 
 import { JwtPayload } from '../auth/auth.types'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { AccessTokenGuard } from '../auth/guards/access-token.guard'
 import { UsersService } from '../users/users.service'
+import { CloudinaryService } from '../cloudinary/cloudinary.service'
 
 function fileExt(input: string) {
   const ext = extname(input || '').toLowerCase()
@@ -19,24 +18,15 @@ function fileExt(input: string) {
 @Controller('uploads')
 @UseGuards(AccessTokenGuard)
 export class UploadsController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   @Post('avatar')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (_req: any, _file: any, cb: any) => {
-          const dest = join(process.cwd(), 'uploads', 'avatars')
-          mkdirSync(dest, { recursive: true })
-          cb(null, dest)
-        },
-        filename: (_req: any, file: any, cb: any) => {
-          const ext = fileExt(file.originalname)
-          if (!ext) return cb(new Error('Invalid file'), '')
-          const name = `${Date.now()}_${randomBytes(8).toString('hex')}${ext}`
-          cb(null, name)
-        },
-      }),
+      storage: (multer as any).memoryStorage(),
       limits: { fileSize: 3 * 1024 * 1024 },
       fileFilter: (_req: any, file: any, cb: any) => {
         const ext = fileExt(file.originalname)
@@ -46,7 +36,8 @@ export class UploadsController {
   )
   async uploadAvatar(@UploadedFile() file: any, @CurrentUser() user: JwtPayload) {
     if (!file) throw new BadRequestException('Thiếu file')
-    const url = `/uploads/avatars/${file.filename}`
+
+    const { url } = await this.cloudinary.uploadBuffer(file.buffer, 'avatars')
 
     const updated = await this.usersService.updateProfile(user.sub, { avatarUrl: url })
     if (!updated) throw new BadRequestException('Tài khoản không tồn tại')
@@ -72,4 +63,3 @@ export class UploadsController {
     }
   }
 }
-
