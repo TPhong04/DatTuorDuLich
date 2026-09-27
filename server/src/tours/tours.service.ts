@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { Model } from 'mongoose'
+import { Model, Types } from 'mongoose'
 
 import { Tour, TourDeparture, TourDocument, TourDepartureStatus, TourReview } from './tour.schema'
 
@@ -245,6 +245,243 @@ export class ToursService {
     return {
       reviewCount: count,
       avgRating: avg == null ? null : Math.round(avg * 10) / 10,
+    }
+  }
+
+  async listDepartures(opts: {
+    tab?: 'month' | 'week' | 'all' | 'low_stock' | 'soldout' | 'soon_24h'
+    monthISO?: string | null
+    q?: string | null
+    skip?: number
+    limit?: number
+  }) {
+    const tab = opts.tab ?? 'month'
+    const skip = Math.max(0, Number(opts.skip) || 0)
+    const limit = Math.min(200, Math.max(1, Number(opts.limit) || 50))
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const todayEnd = new Date(todayStart.getTime() + 86400000)
+
+    // Date range theo tab
+    let dateMatch: any = null
+    switch (tab) {
+      case 'week': {
+        const dayOfWeek = todayStart.getDay() // 0 CN..6 T7 (VN đầu tuần Thứ 2: lùi (dayOfWeek+6)%7
+        const offset = (dayOfWeek + 6) % 7
+        const weekStart = new Date(todayStart.getTime() - offset * 86400000)
+        const weekEnd = new Date(weekStart.getTime() + 7 * 86400000)
+        dateMatch = { $gte: weekStart, $lt: weekEnd }
+        break
+      }
+      case 'soon_24h': {
+        dateMatch = { $gte: now, $lt: new Date(now.getTime() + 86400000) }
+        break
+      }
+      case 'month':
+      default: {
+        // Mặc định: tháng hiện tại, nếu có monthISO (YYYY-MM) thì dùng
+        let y = now.getFullYear()
+        let m = now.getMonth()
+        if (opts.monthISO && /^\d{4}-\d{2}$/.test(opts.monthISO)) {
+          const [ys, ms] = opts.monthISO.split('-')
+          y = parseInt(ys, 10)
+          m = parseInt(ms, 10) - 1
+        }
+        const monthStart = new Date(y, m, 1)
+        const nextMonthStart = new Date(y, m + 1, 1)
+        dateMatch = { $gte: monthStart, $lt: nextMonthStart }
+        break
+      }
+      case 'all': {
+        dateMatch = null
+        break
+      }
+    }
+
+    const pipeline: any[] = []
+    // Stage 1: search theo tour (title/slug/code/region) trước khi $unwind (để giảm docs)
+    if (opts.q?.trim()) {
+      const q = opts.q.trim()
+      const qRe = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      pipeline.push({
+        $match: {
+          $or: [{ title: qRe }, { slug: qRe }, { code: qRe }, { region: qRe }, { themes: qRe }, { categories: qRe }],
+        },
+      })
+    }
+    pipeline.push({
+      $project: {
+        _id: 1,
+        title: 1,
+        slug: 1,
+        code: 1,
+        region: 1,
+        durationDays: 1,
+        durationNights: 1,
+        departureFrom: 1,
+        coverImageUrl: 1,
+        isPublished: 1,
+        departures: 1,
+      },
+    })
+    pipeline.push({ $unwind: { path: '$departures', includeArrayIndex: 'depIdx' } })
+
+    // Stage dateMatch sau khi $unwind (hoặc trước cũng được, pipeline tối ưu đã push match)
+    if (dateMatch) pipeline.push({ $match: { 'departures.departureDate': dateMatch } })
+
+    // Tab đặc biệt (sau khi có dep object)
+    switch (tab) {
+      case 'soldout':
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'departures.status': 'soldout' },
+              { $expr: { $lte: ['$departures.seatsAvailable', 0] } },
+            ],
+          },
+        })
+        break
+      case 'low_stock':
+        pipeline.push({
+          $match: {
+            'departures.status': { $nin: ['cancelled', 'closed', 'soldout'] },
+            $expr: {
+              $and: [
+                { $gt: ['$departures.seatsTotal', 0] },
+                { $lte: [{ $divide: ['$departures.seatsAvailable', '$departures.seatsTotal'] }, 0.15] },
+              ],
+            },
+          },
+        })
+        break
+    }
+
+    // Sort theo ngày đi tăng dần (sớm nhất đầu)
+    pipeline.push({ $sort: { 'departures.departureDate': 1 } })
+
+    // Count tổng (phục vụ pagination): $facet
+    pipeline.push({
+      $facet: {
+        rows: [{ $skip: skip }, { $limit: limit }],
+        meta: [{ $count: 'total' }],
+      },
+    })
+
+    const [res] = await this.tours.aggregate(pipeline).exec()
+    const rows = (res?.rows ?? []) as any[]
+    const total = Number(res?.meta?.[0]?.total ?? 0)
+
+    const items = rows.map((r: any) => {
+      const dep = r.departures ?? {}
+      const seatsTotal = Number(dep.seatsTotal || 0)
+      const seatsAvailable = Math.min(seatsTotal, Math.max(0, Number(dep.seatsAvailable || 0)))
+      const fillRate = seatsTotal > 0 ? seatsAvailable / seatsTotal : 0
+      let status: TourDepartureStatus = dep.status
+      if (!status || !['open', 'closed', 'cancelled', 'soldout'].includes(status)) {
+        if (seatsAvailable <= 0) status = 'soldout'
+        else status = 'open'
+      }
+      // Derived badges
+      const depDate = dep.departureDate instanceof Date ? dep.departureDate : new Date(dep.departureDate as any)
+      const within24h = depDate.getTime() > now.getTime() && depDate.getTime() <= now.getTime() + 86400000
+      const depPast = depDate.getTime() < todayStart.getTime()
+      const depNow = depDate.getTime() >= todayStart.getTime() && depDate.getTime() < todayEnd.getTime()
+
+      return {
+        id: String(dep._id?.toString?.() ?? dep._id ?? r.depIdx ?? ''),
+        depIdx: Number(r.depIdx),
+        tourId: String(r._id.toString()),
+        tourTitle: r.title ?? '',
+        tourSlug: r.slug ?? '',
+        tourCode: r.code ?? null,
+        tourRegion: r.region ?? null,
+        durationDays: Number(r.durationDays ?? 1),
+        durationNights: Number(r.durationNights ?? 0),
+        departureFrom: r.departureFrom ?? null,
+        coverImageUrl: r.coverImageUrl ?? null,
+        isTourPublished: Boolean(r.isPublished),
+        departureDateISO: depDate.toISOString(),
+        standardText: dep.standardText ?? null,
+        priceAdult: Number(dep.priceAdult || 0),
+        priceChild: typeof dep.priceChild === 'number' ? dep.priceChild : null,
+        priceInfant: typeof dep.priceInfant === 'number' ? dep.priceInfant : null,
+        originalPriceAdult: typeof dep.originalPriceAdult === 'number' ? dep.originalPriceAdult : null,
+        discountPercent: typeof dep.discountPercent === 'number' ? dep.discountPercent : null,
+        seatsTotal,
+        seatsBooked: seatsTotal - seatsAvailable,
+        seatsAvailable,
+        fillRatePct: seatsTotal > 0 ? Math.round((1 - fillRate) * 100) : 0,
+        status,
+        badgeWithin24h: within24h && !depPast,
+        badgeIsToday: depNow,
+        badgePast: depPast,
+      }
+    })
+
+    return { items, total, skip, limit }
+  }
+
+  async patchDeparture(depIdHex: string, patch: {
+    priceAdult?: number
+    priceChild?: number | null
+    priceInfant?: number | null
+    originalPriceAdult?: number | null
+    discountPercent?: number | null
+    seatsTotal?: number
+    seatsAvailable?: number
+    status?: TourDepartureStatus
+    standardText?: string | null
+    departureDate?: string | null
+  }) {
+    if (!depIdHex) throw new BadRequestException('Missing departure id')
+    // Step 1: Tìm tour chứa departure._id
+    const tour = await this.tours
+      .findOne({ 'departures._id': new Types.ObjectId(depIdHex) })
+      .select('_id departures')
+      .exec()
+    if (!tour) throw new NotFoundException('Không tìm thấy departure')
+    const deps = Array.isArray((tour as any).departures) ? (tour as any).departures : []
+    const depIdx = deps.findIndex((d: any) => String(d._id?.toString?.() ?? d._id) === depIdHex)
+    if (depIdx < 0) throw new NotFoundException('departure không nằm trong tour')
+
+    const current = deps[depIdx] as TourDeparture
+    // Tính toán normalize 1 phần departure (giống normalizeDeparture nhưng chỉ patch field được cung cấp)
+    const next: any = { ...current }
+    if ('departureDate' in patch) {
+      const d = patch.departureDate ? toDate(String(patch.departureDate)) : null
+      if (!d) throw new BadRequestException('departureDate không hợp lệ (YYYY-MM-DD)')
+      next.departureDate = d
+    }
+    if ('standardText' in patch) next.standardText = patch.standardText ? String(patch.standardText).trim() : null
+    if ('priceAdult' in patch) next.priceAdult = Math.max(0, Number(patch.priceAdult) || 0)
+    if ('priceChild' in patch) next.priceChild = patch.priceChild == null ? null : Math.max(0, Number(patch.priceChild) || 0)
+    if ('priceInfant' in patch) next.priceInfant = patch.priceInfant == null ? null : Math.max(0, Number(patch.priceInfant) || 0)
+    if ('originalPriceAdult' in patch) next.originalPriceAdult = patch.originalPriceAdult == null ? null : Math.max(0, Number(patch.originalPriceAdult) || 0)
+    if ('discountPercent' in patch) next.discountPercent = patch.discountPercent == null ? null : Math.min(100, Math.max(0, Number(patch.discountPercent) || 0))
+    // Tự apply lại giá discount (như normalizeDeparture): nếu discountPercent>0 + originalPriceAdult thì tính giá khuyến mãi
+    if (typeof next.discountPercent === 'number' && next.discountPercent > 0 && typeof next.originalPriceAdult === 'number' && next.originalPriceAdult > 0) {
+      next.priceAdult = applyDiscountToPrice(next.originalPriceAdult ?? null, next.discountPercent) ?? next.priceAdult
+      next.priceChild = applyDiscountToPrice(next.originalPriceChild ?? null, next.discountPercent) ?? next.priceChild
+      next.priceInfant = applyDiscountToPrice(next.originalPriceInfant ?? null, next.discountPercent) ?? next.priceInfant
+    }
+    if ('seatsTotal' in patch) next.seatsTotal = Math.max(0, Math.floor(Number(patch.seatsTotal) || 0))
+    if ('seatsAvailable' in patch) next.seatsAvailable = Math.min(Math.max(0, next.seatsTotal || 0), Math.max(0, Math.floor(Number(patch.seatsAvailable) || 0)))
+    if ('status' in patch) {
+      next.status = ['open', 'closed', 'cancelled', 'soldout'].includes(patch.status as any) ? (patch.status as TourDepartureStatus) : 'open'
+    }
+
+    // Atomic update vào đúng idx
+    const setPatch: any = {}
+    Object.keys(next).forEach((k) => {
+      setPatch[`departures.${depIdx}.${k}`] = (next as any)[k]
+    })
+    const updated = await this.tours.findByIdAndUpdate(tour._id, { $set: setPatch }, { new: true }).exec()
+    if (!updated) throw new NotFoundException('Không tìm thấy tour')
+    return {
+      ok: true,
+      tourId: String(updated._id),
+      depId: depIdHex,
+      depIdx,
     }
   }
 

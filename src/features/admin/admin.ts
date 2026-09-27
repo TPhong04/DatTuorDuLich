@@ -267,6 +267,79 @@ export async function adminDeleteTour(id: string) {
   return apiFetch<{ ok: true }>(`/admin/tours/${id}`, { method: 'DELETE' })
 }
 
+// ============ Departure list (Lịch khởi hành Operations dashboard) ============
+export type DepartureTab = 'month' | 'week' | 'soon_24h' | 'all' | 'low_stock' | 'soldout'
+export type AdminDepartureStatus = 'open' | 'closed' | 'cancelled' | 'soldout'
+export type AdminDepartureRow = {
+  id: string
+  depIdx: number
+  tourId: string
+  tourTitle: string
+  tourSlug: string
+  tourCode: string | null
+  tourRegion: string | null
+  durationDays: number
+  durationNights: number
+  departureFrom: string | null
+  coverImageUrl: string | null
+  isTourPublished: boolean
+  departureDateISO: string
+  standardText: string | null
+  priceAdult: number
+  priceChild: number | null
+  priceInfant: number | null
+  originalPriceAdult: number | null
+  discountPercent: number | null
+  seatsTotal: number
+  seatsBooked: number
+  seatsAvailable: number
+  fillRatePct: number
+  status: AdminDepartureStatus
+  badgeWithin24h: boolean
+  badgeIsToday: boolean
+  badgePast: boolean
+}
+
+export async function adminListDepartures(opts: {
+  tab?: DepartureTab
+  month?: string // YYYY-MM
+  q?: string
+  skip?: number
+  limit?: number
+}) {
+  const params = new URLSearchParams()
+  if (opts.tab) params.set('tab', opts.tab)
+  if (opts.month) params.set('month', opts.month)
+  if (opts.q?.trim()) params.set('q', opts.q.trim())
+  if (typeof opts.skip === 'number') params.set('skip', String(opts.skip))
+  if (typeof opts.limit === 'number') params.set('limit', String(opts.limit))
+  const qs = params.toString()
+  return apiFetch<{ items: AdminDepartureRow[]; total: number; skip: number; limit: number }>(
+    `/admin/tours/departures${qs ? `?${qs}` : ''}`,
+  )
+}
+
+export async function adminPatchDeparture(
+  depId: string,
+  patch: {
+    priceAdult?: number
+    priceChild?: number | null
+    priceInfant?: number | null
+    originalPriceAdult?: number | null
+    discountPercent?: number | null
+    seatsTotal?: number
+    seatsAvailable?: number
+    status?: AdminDepartureStatus
+    standardText?: string | null
+    departureDate?: string | null
+  },
+) {
+  return apiFetch<{ ok: boolean; tourId: string; depId: string; depIdx: number }>(`/admin/tours/departures/${depId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
 export async function adminUploadImage(input: { file: File; category: string }) {
   const form = new FormData()
   form.set('file', input.file)

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { ZodError } from 'zod'
 
 import { JwtPayload } from '../auth/auth.types'
@@ -142,6 +142,56 @@ export class AdminToursController {
     private readonly tours: ToursService,
     private readonly auditLogs: AuditLogsService,
   ) {}
+
+  @Get('departures')
+  async listDepartures(
+    @CurrentUser() _actor: JwtPayload,
+    @Query() raw: Record<string, unknown>,
+  ) {
+    const tab = (['month', 'week', 'all', 'low_stock', 'soldout', 'soon_24h'] as const).includes(String(raw.tab) as any)
+      ? (String(raw.tab) as any)
+      : 'month'
+    const monthISO = typeof raw.month === 'string' && /^\d{4}-\d{2}$/.test(raw.month) ? raw.month : null
+    const q = typeof raw.q === 'string' ? raw.q.trim() : null
+    const skip = Math.max(0, Number(raw.skip) || 0)
+    const limit = Math.min(200, Math.max(1, Number(raw.limit) || 50))
+    const res = await this.tours.listDepartures({ tab, monthISO, q, skip, limit })
+    return res
+  }
+
+  @Patch('departures/:id')
+  async patchDeparture(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id') depId: string,
+    @Body() body: unknown,
+  ) {
+    const raw = body as Record<string, unknown>
+    const patch: Parameters<ToursService['patchDeparture']>[1] = {}
+    const numField = (k: string) => (raw[k] === undefined ? undefined : raw[k] === null ? null : Number(raw[k]))
+    const strField = (k: string) => (raw[k] === undefined ? undefined : raw[k] === null ? null : String(raw[k]))
+    const status = raw.status
+    if (status === 'open' || status === 'closed' || status === 'cancelled' || status === 'soldout') patch.status = status
+    if (numField('priceAdult') !== undefined) patch.priceAdult = numField('priceAdult') as number
+    if (raw.priceChild !== undefined) patch.priceChild = numField('priceChild') as any
+    if (raw.priceInfant !== undefined) patch.priceInfant = numField('priceInfant') as any
+    if (raw.originalPriceAdult !== undefined) patch.originalPriceAdult = numField('originalPriceAdult') as any
+    if (raw.discountPercent !== undefined) patch.discountPercent = numField('discountPercent') as any
+    if (numField('seatsTotal') !== undefined) patch.seatsTotal = numField('seatsTotal') as number
+    if (numField('seatsAvailable') !== undefined) patch.seatsAvailable = numField('seatsAvailable') as number
+    if ('standardText' in raw) patch.standardText = strField('standardText') as any
+    if ('departureDate' in raw) patch.departureDate = strField('departureDate') as any
+    const out = await this.tours.patchDeparture(depId, patch)
+    await this.auditLogs.create({
+      actorUserId: actor.sub,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      action: 'admin.tour.departure.patch',
+      entityType: 'tour',
+      entityId: out.tourId,
+      meta: { depId: out.depId, depIdx: out.depIdx, patch },
+    }).catch(() => {})
+    return out
+  }
 
   @Get()
   async list() {

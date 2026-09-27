@@ -213,7 +213,7 @@ export default function NotificationBell() {
             <div>
               <div className="text-sm font-bold text-slate-900">Thông báo</div>
               <div className="text-xs text-slate-500">
-                {socket.state.connected ? `● Online · ${unreadCount} chưa đọc` : socket.state.connecting ? '●●● Đang kết nối...' : `● Offline · ${socket.state.error || 'Lỗi kết nối'}`}
+                {unreadCount === 0 ? 'Bạn không có thông báo chưa đọc' : unreadCount === 1 ? '1 thông báo chưa đọc' : `${unreadCount} thông báo chưa đọc`}
               </div>
             </div>
             <div className="flex items-center gap-1">

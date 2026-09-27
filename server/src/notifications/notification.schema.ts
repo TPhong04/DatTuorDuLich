@@ -49,6 +49,12 @@ export type NotificationType =
   | 'chat_sla_pickup_breached'
   | 'chat_sla_reply_breached'
   | 'chat_sla_pickup_breached_unassigned'
+  // ✅ DEP-N: Cảnh báo tour / lịch khởi hành
+  | 'departure_soldout'
+  | 'departure_low_stock'
+  | 'departure_within_24h'
+  | 'departure_today'
+  | 'departure_last_7days_booking'
 
 @Schema({ timestamps: true, collection: 'notifications' })
 export class Notification {
