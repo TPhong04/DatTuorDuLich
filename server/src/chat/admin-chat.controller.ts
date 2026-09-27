@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards, BadRequestException } from '@nestjs/common'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { AccessTokenGuard } from '../auth/guards/access-token.guard'
@@ -80,7 +80,8 @@ export class AdminChatController {
   async staffReply(@Param('id') id: string, @Body() body: unknown, @CurrentUser() user: JwtPayload) {
     const { message } = (body as any) || {}
     if (typeof message !== 'string' || message.length < 1 || message.length > 4000) {
-      throw new Error('Nội dung tin nhắn 1-4000 ký tự')
+      // ✅ AI-5a: Dùng BadRequestException chuẩn NestJS (HTTP 400) thay vì throw Error (HTTP 500)
+      throw new BadRequestException('Nội dung tin nhắn phải từ 1-4000 ký tự.')
     }
     const uid = (user as any).id || (user as any).sub || ''
     return this.chat.staffReply(id, message, uid)
@@ -89,13 +90,22 @@ export class AdminChatController {
   // ============== PHASE 2 - Thống kê ==============
 
   @Get('stats/dashboard')
-  async chatDashboardStats(@Query() query: unknown) {
+  @Roles('admin') // ✅ AI-5b: Staff xem KPI cá nhân thôi, chỉ ADMIN mới xem dashboard toàn hệ thống (bảo mật số liệu)
+  async chatDashboardStats(@Query() query: unknown, @CurrentUser() user: JwtPayload) {
+    if ((user as any).role !== 'admin') throw new ForbiddenException('Chỉ admin xem dashboard tổng hợp hệ thống.')
     const dto = chatStatsDto.parse(query || {})
     return this.chat.chatDashboardStats(dto)
   }
 
   @Get('stats/staff/:staffUserId')
-  async staffKpi(@Param('staffUserId') staffUserId: string, @Query() query: unknown) {
+  @Roles('staff', 'admin')
+  async staffKpi(@Param('staffUserId') staffUserId: string, @Query() query: unknown, @CurrentUser() user: JwtPayload) {
+    // ✅ AI-5b: Staff role chỉ xem được KPI CỦA CHÍNH HỌ; admin xem tất cả.
+    const actorRole = ((user as any).role as UserRole) || 'staff'
+    const actorUid = (user as any).id || (user as any).sub || ''
+    if (actorRole !== 'admin' && String(staffUserId) !== String(actorUid)) {
+      throw new ForbiddenException('Bạn chỉ được xem KPI của chính mình.')
+    }
     const dto = chatStatsDto.parse(query || {})
     return this.chat.staffKpi(staffUserId, dto)
   }

@@ -19,6 +19,15 @@ export class ChatMessage extends Document {
 
   @Prop({ type: Object })
   toolResult?: Record<string, any> // kết quả trả về từ tool
+
+  // ✅ AI-3b: Field đánh dấu message là log nội bộ hệ thống (filter UI ẩn)
+  //   true = không show trong widget khách, admin detail vẫn có thể xem nếu cần
+  @Prop({ type: Boolean, default: false })
+  system?: boolean
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  createdByStaffId?: Types.ObjectId | string | null // STAFF role: lưu ai đã gửi (cho breachedReplyCount aggregate)
 }
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage)
+ChatMessageSchema.index({ sessionId: 1, createdAt: 1 })

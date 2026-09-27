@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types } from 'mongoose'
+import { Document, Types, Schema as MongooseSchema } from 'mongoose'
+const SchemaTypes = MongooseSchema.Types
 
 export type ChatStatus = 'BOT' | 'ESCALATED' | 'CLOSED'
 
@@ -88,6 +89,15 @@ export class ChatSession extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })
   escalatedByStaffId?: Types.ObjectId | string | null // nếu admin/staff tự escalate một session BOT
+
+  // ✅ H2: Field mới đánh dấu staff chủ động can thiệp từ trạng thái BOT
+  //    true = firstResponseSeconds không dùng tính KPI trung bình (vì escalatedAt = firstResponseAt = cùng lúc)
+  @Prop({ type: Boolean, default: false })
+  autoEscalatedByStaff?: boolean
+
+  // ✅ AI Resiliency: Lưu lịch sử model parts (role + parts JSON) để AI duy trì context giữa các turn tin nhắn
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  aiHistory?: any[]
 }
 
 export const ChatSessionSchema = SchemaFactory.createForClass(ChatSession)

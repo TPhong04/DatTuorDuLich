@@ -143,6 +143,20 @@ export default function AdminChatDetailPage() {
   const [assignNote, setAssignNote] = useState('')
   const [staffList, setStaffList] = useState<any[]>([])
   const [staffLoading, setStaffLoading] = useState(false)
+  // ✅ L3: Search staff debounce 300ms (filter local + remote API nếu team > 400)
+  const [assignSearch, setAssignSearch] = useState('')
+  const assignSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Local filter memo (không gọi API nếu đã load < 400 user)
+  const filteredStaffList = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase()
+    if (!q) return staffList
+    return staffList.filter((u) => {
+      const name = (u.fullName || u.name || '').toLowerCase()
+      const email = (u.email || '').toLowerCase()
+      const phone = (u.phone || '').toLowerCase()
+      return name.includes(q) || email.includes(q) || phone.includes(q)
+    })
+  }, [staffList, assignSearch])
 
   // Transfer modal
   const [transferOpen, setTransferOpen] = useState(false)
@@ -258,10 +272,14 @@ export default function AdminChatDetailPage() {
     }
   }, [sessionId])
 
-  // Emit typing
+  // ✅ M3: Debounce typing emit 500ms — chỉ emit typing 1 lần sau khi dừng gõ 500ms (không spam WS mỗi ký tự)
+  const typingEmitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onInputChange = (v: string) => {
     setInput(v)
-    socketRef.current?.emit('chat:staff-typing', { sessionId })
+    if (typingEmitTimerRef.current) clearTimeout(typingEmitTimerRef.current)
+    typingEmitTimerRef.current = setTimeout(() => {
+      socketRef.current?.emit('chat:staff-typing', { sessionId })
+    }, 500)
   }
 
   const doSend = async (e: FormEvent) => {
@@ -361,6 +379,23 @@ export default function AdminChatDetailPage() {
   }
 
   const customerLabel = useMemo(() => (session?.guestName || session?.guestEmail || session?.guestPhone || 'Khách vãng lai'), [session])
+  // ✅ L6: Tên người đóng chat (từ staffList đã load) - hiển thị chi tiết trong summary box
+  const closedByStaffName = useMemo(() => {
+    if (!session?.closedByStaffId) return null
+    if (String(session.assignedTo || '') === String(session.closedByStaffId)) return session.assignedStaffName
+    const found = staffList.find((u: any) => String(u.id) === String(session.closedByStaffId))
+    return found ? (found.fullName || found.email) : `Nhân viên #${session.closedByStaffId.slice(-6)}`
+  }, [session, staffList])
+  // ✅ L6: Label tiếng Việt dễ đọc cho closedReason (thay vì admin_closed, staff_closed ...)
+  const closedReasonLabel: Record<string, string> = {
+    resolved_by_staff: 'Nhân viên xác nhận đã xử lý xong',
+    resolved_by_bot: 'Bot xử lý xong',
+    customer_idle_timeout: 'Khách không phản hồi quá 24 giờ (tự đóng)',
+    staff_closed: 'Nhân viên đóng thủ công',
+    admin_closed: 'Quản trị viên đóng thủ công',
+    auto_closed_24h: 'Tự động đóng sau 24 giờ không tương tác',
+    unknown: 'Không ghi nhận lý do',
+  }
 
   if (loading && !session) {
     return (
@@ -443,6 +478,19 @@ export default function AdminChatDetailPage() {
               <div className="text-slate-500">Nhận lúc</div><div>{session.escalatedAt ? new Date(session.escalatedAt).toLocaleString('vi-VN') : '—'}</div>
               <div className="text-slate-500">Gán lúc</div><div>{session.assignedAt ? new Date(session.assignedAt).toLocaleString('vi-VN') : '—'}</div>
               <div className="text-slate-500">Đóng lúc</div><div>{session.closedAt ? new Date(session.closedAt).toLocaleString('vi-VN') : '—'}</div>
+              {/* ✅ L6: Hiển thị lý do đóng + người đóng (thay vì chỉ có closedAt) */}
+              <div className="text-slate-500">Lý do đóng</div>
+              <div>
+                {session.status === 'CLOSED'
+                  ? (session.closedReason ? closedReasonLabel[session.closedReason] || session.closedReason : 'Không ghi nhận')
+                  : '—'}
+              </div>
+              <div className="text-slate-500">Người đóng</div>
+              <div className="font-medium text-slate-800">
+                {session.status === 'CLOSED'
+                  ? (closedByStaffName || (session.closedReason && session.closedReason.startsWith('auto_') ? '🤖 Hệ thống tự động' : '—') || '—')
+                  : '—'}
+              </div>
             </div>
           </div>
 
@@ -547,13 +595,45 @@ export default function AdminChatDetailPage() {
           <form onSubmit={doAssign} className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="font-semibold text-slate-800 mb-2">Giao nhân viên phụ trách</div>
             <div className="mb-3">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tìm nhân viên</label>
+              <input
+                type="search"
+                value={assignSearch}
+                aria-label="Tìm kiếm nhân viên theo tên, email hoặc số điện thoại"
+                placeholder="Tìm theo tên / email / SĐT..."
+                onChange={(e) => {
+                  const v = e.target.value
+                  setAssignSearch(v)
+                  if (assignSearchTimerRef.current) clearTimeout(assignSearchTimerRef.current)
+                  // ✅ L3: Debounce 300ms, nếu staffList < 400 thì filter local thôi (không gọi API)
+                  // Nếu team lớn và cần search remote: thêm block call adminListUsers({ q: v, role: 'staff', limit: 200 }) ở đây
+                  assignSearchTimerRef.current = setTimeout(async () => {
+                    if (staffList.length < 400) return // local filter đủ
+                    try {
+                      const [s, a] = await Promise.all([
+                        adminListUsers({ page: 1, limit: 200, role: 'staff', q: v.trim() || undefined } as any),
+                        adminListUsers({ page: 1, limit: 100, role: 'admin', q: v.trim() || undefined } as any),
+                      ])
+                      setStaffList([...((s as any).items || []), ...((a as any).items || [])].filter((x) => x.active !== false))
+                    } catch {
+                      /* ignore */
+                    }
+                  }, 300)
+                }}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm mb-2"
+              />
+            </div>
+            <div className="mb-3">
               <label className="block text-xs font-medium text-slate-600 mb-1">Nhân viên</label>
               <select required className="w-full rounded border border-slate-300 px-3 py-2 text-sm" value={assignStaffId} onChange={(e) => setAssignStaffId(e.target.value)} disabled={staffLoading}>
                 <option value="">-- Chọn nhân viên --</option>
-                {staffList.map((u) => (
+                {filteredStaffList.map((u) => (
                   <option key={u.id} value={u.id}>{u.fullName || u.email} ({u.role})</option>
                 ))}
               </select>
+              <div className="text-[11px] text-slate-500 mt-1">
+                {filteredStaffList.length !== staffList.length && `Hiển thị ${filteredStaffList.length} / ${staffList.length} nhân viên theo từ khóa tìm kiếm`}
+              </div>
             </div>
             <div className="mb-4">
               <label className="block text-xs font-medium text-slate-600 mb-1">Ghi chú</label>

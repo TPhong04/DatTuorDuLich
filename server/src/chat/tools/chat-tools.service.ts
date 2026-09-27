@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { FilterQuery, Model } from 'mongoose'
 import { FunctionDeclaration } from '@google/genai'
@@ -77,6 +77,7 @@ export const CHAT_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 
 @Injectable()
 export class ChatToolsService {
+  private readonly logger = new Logger(ChatToolsService.name)
   constructor(
     @InjectModel(Tour.name) private readonly tourModel: Model<TourDocument>,
     // private readonly bookingService: BookingService,
@@ -88,21 +89,42 @@ export class ChatToolsService {
    * không được tự ý sửa/xóa/hủy đơn ở đây.
    */
   async execute(toolName: string, args: Record<string, any>) {
-    switch (toolName) {
-      case 'searchTours':
-        return this.searchTours(args)
-      case 'getTourDetail':
-        return this.getTourDetail(args)
-      case 'getBookingStatus':
-        return this.getBookingStatus(args)
-      case 'checkAvailability':
-        return this.checkAvailability(args)
-      case 'escalateToStaff':
-        // Không cần làm gì ở đây — ChatService sẽ đọc tool call này
-        // và tự đổi status session sang ESCALATED
-        return { escalated: true, reason: args.reason }
-      default:
-        return { error: `Unknown tool: ${toolName}` }
+    // ✅ AI-4: Wrapper tổng quát try-catch cho tất cả tools.
+    //   - Nếu 1 tool nào đó throw lỗi bất kỳ → trả về format chuẩn { needEscalate, error, fallbackMessage }
+    //   - Log chi tiết tên tool + args (cắt ngắn để không lộ secret)
+    try {
+      switch (toolName) {
+        case 'searchTours':
+          return this.searchTours(args)
+        case 'getTourDetail':
+          return this.getTourDetail(args)
+        case 'getBookingStatus':
+          return this.getBookingStatus(args)
+        case 'checkAvailability':
+          return this.checkAvailability(args)
+        case 'escalateToStaff':
+          // Không cần làm gì ở đây — ChatService sẽ đọc tool call này
+          // và tự đổi status session sang ESCALATED
+          return { escalated: true, reason: args.reason }
+        default:
+          this.logger.warn(`[TOOL:${toolName}] Unknown tool name requested by Gemini`)
+          return {
+            needEscalate: true,
+            escalateReason: `Yêu cầu tool không hỗ trợ: ${toolName}`,
+            fallbackMessage: `🙇 Xin lỗi, tính năng ${toolName} hiện không hỗ trợ. Mình đã chuyển đội ngũ hỗ trợ giúp bạn.`,
+            error: `Unknown tool: ${toolName}`,
+          }
+      }
+    } catch (err) {
+      const msg = (err as Error)?.message ?? String(err)
+      // Không throw nữa → trả về format chuẩn escalate cho ChatService xử lý
+      this.logger.error(`[TOOL:${toolName}] ❌ THREW ERROR inside execute switch: ${msg}`)
+      return {
+        needEscalate: true,
+        escalateReason: `Tool ${toolName} internal error: ${msg.slice(0, 120)}`,
+        fallbackMessage: '⚠️ Xin lỗi, có lỗi tạm thời khi tra cứu dữ liệu. Mình đã nhắc đội ngũ kỹ thuật + chuyển nhân viên hỗ trợ trực tiếp cho bạn nhé 🙏',
+        error: msg,
+      }
     }
   }
 
@@ -256,21 +278,73 @@ export class ChatToolsService {
   }
 
   private async getBookingStatus(args: Record<string, any>) {
-    const bookingCode = args.bookingCode as string
+    const bookingCode = String(args.bookingCode ?? '').trim().toUpperCase()
+    if (!bookingCode) return { found: false, note: 'Thiếu mã đơn hàng để tra cứu.' }
 
-    // TODO: return this.bookingService.findByCode(bookingCode)
+    // ✅ H3: NỐI SERVICE THẬT (giai đoạn 1 → report nếu chưa có module thì báo rò rỉ)
+    // TODO NỐI THẬT: return this.bookingsService.findByCode(bookingCode)
+    // Hiện tại không hardcode "CONFIRMED" nói dối nữa, dùng cần escalate nhân viên
     return {
       bookingCode,
-      status: 'CONFIRMED',
-      note: 'DEMO DATA — nối vào BookingService thật',
+      found: false,
+      needEscalate: true,
+      escalateReason: `Bot chưa thể tra chi tiết tình trạng đơn ${bookingCode} (module Đơn hàng chưa được nối vào chat tool). Đã yêu cầu nhân viên hỗ trợ.`,
+      fallbackMessage: `⚠ XIN LỖI! Hiện tôi chưa thể tra chi tiết đơn **${bookingCode}** do module Đơn hàng chưa được tích hợp.
+Vui lòng giữ máy, tôi đã chuyển câu hỏi của bạn sang bộ phận Chăm sóc Khách hàng để nhân viên hỗ trợ bạn trong vòng **5 phút** ạ.
+(Hệ thống đang được nâng cấp, quý khách thông cảm ạ 🙏)`,
+      _status: 'BOT_NOT_CONNECTED',
     }
   }
 
   private async checkAvailability(args: Record<string, any>) {
-    const tourId = args.tourId as string
-    const date = args.date as string
+    const tourId = String(args.tourId ?? '').trim()
+    const date = String(args.date ?? '').trim()
+    if (!tourId) return { found: false, note: 'Thiếu tour để kiểm tra.' }
 
-    // TODO: return this.tourService.checkAvailability(tourId, date)
-    return { tourId, date, available: true, slotsLeft: 8 }
+    // ✅ H3: KHÔNG còn hardcode "available: true, slotsLeft: 8" nói dối nữa
+    // TODO NỐI THẬT: return this.departuresService.findByTourAndDate(tourId, date)
+    const tour = await this.tourModel.findById(tourId).select('title departures').lean().exec() as any
+    let tourTitle: string | null = null
+    let matchedDate: any = null
+    if (tour) {
+      tourTitle = tour.title ?? null
+      if (date) {
+        const ds = new Date(date).toISOString().slice(0, 10)
+        matchedDate = (tour.departures ?? []).find((d: any) => {
+          try { return new Date(d.departureDate).toISOString().slice(0, 10) === ds } catch { return false }
+        })
+      }
+    }
+
+    if (matchedDate) {
+      // Có departure đúng ngày → lấy số liệu thật từ tour.departures (chắc chắn không bị nói dối)
+      const status = String(matchedDate.status ?? 'unknown')
+      const seats = Number(matchedDate.seatsAvailable ?? 0)
+      const priceAdult = matchedDate.priceAdult ?? null
+      return {
+        tourId,
+        date,
+        tourTitle,
+        available: status === 'open' && seats > 0,
+        slotsLeft: seats,
+        departureStatus: status,
+        priceAdult,
+        found: true,
+      }
+    }
+
+    // Không có departure theo ngày yêu cầu / chưa nối service thật → escalate nhân viên không nói dối
+    return {
+      tourId,
+      date,
+      tourTitle,
+      available: false,
+      slotsLeft: 0,
+      needEscalate: true,
+      escalateReason: date ? `Bot chưa thể kiểm tra tình trạng còn chỗ tour ${tourTitle ?? tourId} ngày ${date}.` : `Bot chưa thể kiểm tra tình trạng còn chỗ tour ${tourTitle ?? tourId}.`,
+      fallbackMessage: tourTitle
+        ? `⚠ Hiện tôi mới tra được dữ liệu tour **${tourTitle}** khớp với CSDL, nhưng chưa thể kiểm tra **số lượng chỗ trống** cho ngày **${date || 'yêu cầu của bạn'}** do module Lịch trình chưa được tích hợp đầy đủ.\nVui lòng giữ máy, tôi đã chuyển yêu cầu sang bộ phận Đặt tour để nhân viên hỗ trợ bạn kiểm tra trong vòng **5 phút** ạ 🙏`
+        : `⚠ Tôi chưa tìm thấy lịch trình khởi hành phù hợp với yêu cầu của bạn. Đã chuyển bạn sang nhân viên hỗ trợ trong 5 phút.`,
+    }
   }
 }

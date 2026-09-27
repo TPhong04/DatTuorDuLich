@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model, Types } from 'mongoose'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { GoogleGenAI, Content, Part } from '@google/genai'
 import { ChatSession, ChatStatus, ChatClosedReason } from './schemas/chat-session.schema'
 import { ChatMessage, ChatRole } from './schemas/chat-message.schema'
@@ -14,6 +15,7 @@ import {
   AssignSessionDto,
   TransferSessionDto,
   ChatStatsDto,
+  UpdateGuestInfoDto,
 } from './chat.dto'
 import { NotificationsService, CreateNotificationInput } from '../notifications/notifications.service'
 import { UsersService } from '../users/users.service'
@@ -39,6 +41,21 @@ QUY TẮC ESCALATE (chuyển nhân viên thật xử lý):
 
 const MAX_TOOL_LOOPS = 4
 const MODEL = 'gemini-3.6-flash'
+// ✅ A2: Giới hạn thời gian chờ tối đa cho 1 lượt gọi Gemini API (phòng mạng chậm / Google treo → user không chờ lâu)
+const GEMINI_CALL_TIMEOUT_MS = 20_000
+// Thời gian retry lại sau khi gặp rate limit
+const GEMINI_RATE_LIMIT_RETRY_MS = 1_500
+// Thời gian giới hạn toàn bộ loop AI (all tool loops) → nếu vượt quá → escalate ngay, không đợi
+const OVERALL_AI_TIMEOUT_MS = 45_000
+
+// Classify lỗi Gemini trả về → loại message tương ứng cho khách
+type GeminiErrorKind =
+  | 'api_key_missing_or_invalid'
+  | 'timeout'
+  | 'rate_limit'
+  | 'auth_permission_denied'
+  | 'network_or_server'
+  | 'unknown'
 
 // SLA defaults (PICKUP = thời gian staff nhận xử lý kể từ khi escalate; REPLY = thời gian phản hồi tin nhắn sau khi khách gửi)
 export const CHAT_SLA_PICKUP_SECONDS = 5 * 60 // 5 phút
@@ -50,6 +67,11 @@ export type ChatSessionListItem = ReturnType<ChatService['serializeSession']> ex
 export class ChatService {
   private readonly logger = new Logger(ChatService.name)
   private readonly ai: GoogleGenAI
+  /**
+   * ✅ H4: Cache ghi nhớ các session đã emit cảnh báo breached (để không emit spam cùng 1 thông báo mỗi 30s)
+   *   Key = `${sessionId}:${breachedType}`
+   */
+  private readonly breachNotifCache = new Map<string, number>()
 
   constructor(
     @InjectModel(ChatSession.name) private readonly chatSessionModel: Model<ChatSession>,
@@ -59,7 +81,174 @@ export class ChatService {
     private readonly users: UsersService,
     private readonly gateway: ChatGateway,
   ) {
-    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    // ✅ A3 + A4: Pre-validate GEMINI API key ở constructor (early warn + log chi tiết dev không phải đợi request đi mới biết)
+    const k = (process.env.GEMINI_API_KEY || '').trim()
+    if (!k) {
+      this.logger.error(`[CHAT-AI] ⚠️  ENV GEMINI_API_KEY KHÔNG ĐƯỢC CẤU HÌNH. AI BOT SẼ LUÔN BỊ LỖI VÀ TỰ ESCALATE CHO NHÂN VIÊN. Cần set env GEMINI_API_KEY trong file .env backend.`)
+    } else if (k.length < 20 || k.includes('your-key') || k.includes('xxx') || k.includes('YOUR_')) {
+      this.logger.warn(`[CHAT-AI] ⚠️  ENV GEMINI_API_KEY trông như placeholder (${k.length} ký tự, prefix '${k.slice(0, 5)}...'). AI có thể trả về lỗi PermissionDenied. Hãy kiểm tra key thật từ Google AI Studio.`)
+    } else {
+      this.logger.log(`[CHAT-AI] ✅ Đã khởi tạo GoogleGenAI client, model=${MODEL}. Key prefix '${k.slice(0, 6)}...' OK.`)
+    }
+    this.ai = new GoogleGenAI({ apiKey: k })
+  }
+
+  // ✅ A2: Promise generic timeout wrapper - reject sau ms miliseconds nếu promise gốc chưa resolve
+  private promiseWithTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: any
+    const timeoutP = new Promise<never>((_, rej) => {
+      timer = setTimeout(() => rej(new Error(`GEMINI_TIMEOUT_${label}_${ms}ms`)), ms)
+    })
+    return Promise.race([p, timeoutP]).finally(() => clearTimeout(timer))
+  }
+
+  // ✅ A3: Phân loại chi tiết lỗi Gemini trả về → trả kind rõ ràng để handle riêng
+  private classifyGeminiError(err: unknown): GeminiErrorKind {
+    const msg = String((err as any)?.message ?? (err as any)?.error?.message ?? err).toLowerCase()
+    if (msg.includes('api key') || msg.includes('api_key') || msg.includes('authentication') || msg.includes('invalid_argument') && msg.includes('key') || !process.env.GEMINI_API_KEY?.trim()) {
+      return 'api_key_missing_or_invalid'
+    }
+    if (msg.includes('gemini_timeout') || msg.includes('timeout') || msg.includes('deadline_exceeded')) {
+      return 'timeout'
+    }
+    if (this.isRateLimitError(err)) return 'rate_limit'
+    if (msg.includes('permission') || msg.includes('403') || msg.includes('401') || msg.includes('unauthorized') || msg.includes('denied')) {
+      return 'auth_permission_denied'
+    }
+    if (msg.includes('network') || msg.includes('econnreset') || msg.includes('enotfound') || msg.includes('etimedout') || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504') || msg.includes('server')) {
+      return 'network_or_server'
+    }
+    return 'unknown'
+  }
+
+  // ✅ A4: Friendly message cho khách theo từng loại lỗi (rõ ràng, không câu chung chung "hệ thống gặp sự cố")
+  private aiFailureToCustomerMessage(kind: GeminiErrorKind): string {
+    switch (kind) {
+      case 'api_key_missing_or_invalid':
+        return '⚠️ Bot AI tạm thời đang bảo trì cấu hình. Mình đã chuyển cuộc hội thoại này cho bộ phận CSKH để nhân viên hỗ trợ bạn trực tiếp trong vòng 5 phút nhé. Xin lỗi vì sự bất tiện này 🙏'
+      case 'timeout':
+        return '⏳ Bot đang phản hồi lâu hơn dự kiến do có nhiều khách cùng chat. Mình đã chuyển yêu cầu của bạn sang nhân viên hỗ trợ trong giây lát. Bạn vui lòng chờ ít phút nhé 😊'
+      case 'rate_limit':
+        return '📶 Hiện tại có quá nhiều khách hàng sử dụng bot cùng lúc (quá tải). Mình đã chuyển bạn vào hàng đợi nhân viên, sẽ có người liên hệ ngay ạ.'
+      case 'auth_permission_denied':
+        return '🔐 Bot tạm thời không thể truy cập dữ liệu. Mình đã nhắc nhân viên CSKH hỗ trợ bạn trực tiếp, bạn vui lòng chờ ít phút ạ 🙇'
+      case 'network_or_server':
+        return '🌐 Có lỗi đường truyền tới hệ thống AI. Mình đã chuyển yêu cầu sang nhân viên, sẽ có người phản hồi bạn nhanh nhất có thể ạ.'
+      case 'unknown':
+      default:
+        return '🤖 Mình chưa trả lời được ngay. Không sao, mình đã nhắn tin nhắc nhân viên hỗ trợ bạn trong 5 phút nhé.'
+    }
+  }
+
+  /**
+   * ✅ H4: Cron 30 giây quét toàn bộ session ESCALATED → tự kiểm tra SLA và cập nhật realtime
+   *   - Gọi computeSlaStatus() với current time mới nhất
+   *   - Nếu phát hiện breach (chưa từng emit) → emit WS `chat:session-updated` để badge đỏ xuất hiện tự động
+   *   - Đồng thời push in-app notification khẩn cấp cho nhân viên owner (nếu có)
+   */
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async cronRecheckAndBroadcastSlaBreaches() {
+    try {
+      if (!process.env || process.env['DISABLE_CHAT_SLA_CRON'] === '1') return
+      const nowT = Date.now()
+      // Quét các session ESCALATED chưa đóng, có escalatedAt hợp lệ
+      const sessions = await this.chatSessionModel
+        .find({
+          status: 'ESCALATED',
+          escalatedAt: { $ne: null },
+        })
+        .select(
+          '_id assignedTo escalatedAt firstResponseAt lastCustomerMessageAt lastStaffMessageAt status userId guestName',
+        )
+        .lean()
+        .exec()
+
+      for (const session of sessions) {
+        const before = this.computeSlaStatus(session as any)
+        const after = this.computeSlaStatus(session as any) // compute đúng với nowT = Date.now() internal
+        // Trường hợp đặc biệt: force kiểm tra với giờ hiện tại
+        const fakeNow = {
+          ...session,
+          __forceNowT: nowT,
+        }
+        const slaFinal = this.computeSlaStatus({
+          ...fakeNow,
+          status: session.status,
+          escalatedAt: session.escalatedAt,
+          firstResponseAt: session.firstResponseAt,
+          lastCustomerMessageAt: session.lastCustomerMessageAt,
+          lastStaffMessageAt: session.lastStaffMessageAt,
+        } as any)
+
+        if (slaFinal === 'breached_pickup' || slaFinal === 'breached_reply') {
+          // ✅ Idempotent: chỉ emit 1 lần / 1 loại breach (mỗi 10 phút mới cảnh báo lại)
+          const cacheKey = `${String(session._id)}:${slaFinal}`
+          const lastEmitted = this.breachNotifCache.get(cacheKey) ?? 0
+          if (nowT - lastEmitted < 10 * 60 * 1000) continue
+          this.breachNotifCache.set(cacheKey, nowT)
+          // Làm sạch cache nếu quá 24h không emit
+          if (this.breachNotifCache.size > 5000) this.breachNotifCache.clear()
+
+          const breachedLabel =
+            slaFinal === 'breached_pickup'
+              ? `Quá ${Math.round(CHAT_SLA_PICKUP_SECONDS / 60)}ph nhận xử lý`
+              : `Quá ${Math.round(CHAT_SLA_REPLY_SECONDS / 60)}ph phản hồi`
+          const patch: any = {
+            slaStatus: slaFinal,
+            slaBreached: true,
+            slaLabel: breachedLabel,
+            slaWaitSeconds:
+              slaFinal === 'breached_pickup' && session.escalatedAt && !session.firstResponseAt
+                ? Math.max(0, Math.floor((nowT - new Date(session.escalatedAt).getTime()) / 1000))
+                : null,
+          }
+          this.gateway.emitSessionUpdated(String(session._id), patch)
+
+          // Đồng thời push NOTIF cho staff owner (nếu assignedTo có)
+          try {
+            if (session.assignedTo) {
+              const title =
+                slaFinal === 'breached_pickup'
+                  ? '🔴 SLA: Chưa nhận xử lý chat khách'
+                  : '🔴 SLA: Chưa phản hồi tin nhắn khách'
+              const body =
+                slaFinal === 'breached_pickup'
+                  ? `Cuộc chat của khách ${(session as any).guestName ? (session as any).guestName : 'vãng lai'} đã quá ${Math.round(CHAT_SLA_PICKUP_SECONDS / 60)}ph chưa được bạn nhận xử lý. Hãy vào nhận ngay.`
+                  : `Khách gửi tin nhắn đã quá ${Math.round(CHAT_SLA_REPLY_SECONDS / 60)}ph chưa được bạn trả lời. Hãy phản hồi ngay.`
+              await this.notifications.create({
+                recipientId: this.toOid(session.assignedTo),
+                recipientRole: 'staff',
+                type: slaFinal === 'breached_pickup' ? 'chat_sla_pickup_breached' : 'chat_sla_reply_breached',
+                title,
+                body,
+                actionUrl: `/admin/customer-chat/${session._id}`,
+                entityType: 'chat_session',
+                entityId: String(session._id),
+                priority: 'urgent',
+                now: new Date(nowT),
+              } as CreateNotificationInput)
+            } else {
+              // Chưa assign → broad cho toàn bộ staff/admin cảnh báo 1 cuộc chat rảnh chưa ai nhận đã breach
+              await this.broadcastStaffNotification({
+                type: 'chat_sla_pickup_breached_unassigned',
+                title: '🔴 SLA KHẨN CẤP: Chat chờ nhận đã quá hạn',
+                body: `Cuộc chat khách ${(session as any).guestName ? (session as any).guestName : 'vãng lai'} đã quá ${Math.round(CHAT_SLA_PICKUP_SECONDS / 60)}ph chưa ai nhận xử lý. Hãy vào nhận ngay để đảm bảo SLA.`,
+                actionUrl: `/admin/customer-chat/${session._id}`,
+                entityType: 'chat_session',
+                entityId: String(session._id),
+                priority: 'urgent',
+                now: new Date(nowT),
+              }).catch((e) => this.logger.warn(`Broad SLA unassigned failed: ${(e as Error).message}`))
+            }
+          } catch (e) {
+            this.logger.warn(`SLA notif push failed: ${(e as Error).message}`)
+          }
+          this.logger.debug(`[SLA] ${slaFinal} session=${session._id} broadcast + push`)
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`[SLA] cronRecheckAndBroadcastSlaBreaches failed: ${(err as Error).message}`)
+    }
   }
 
   // ==========================================================
@@ -70,12 +259,21 @@ export class ChatService {
     const sessionId = (session._id as Types.ObjectId).toString()
     const now = new Date()
 
-    // Cập nhật trạng thái session (lastCustomerMessageAt + counter)
-    const incPatch: any = { customerMessagesCount: (session.customerMessagesCount || 0) + 1, lastCustomerMessageAt: now }
-    if (dto.guestName && !session.guestName) incPatch.guestName = dto.guestName.trim()
-    if (dto.guestEmail && !session.guestEmail) incPatch.guestEmail = dto.guestEmail.trim()
-    if (dto.guestPhone && !session.guestPhone) incPatch.guestPhone = dto.guestPhone.trim()
-    await this.chatSessionModel.updateOne({ _id: sessionId }, { $set: incPatch })
+    // ✅ AI-2: Dùng MongoDB atomic $inc cho counter (tránh race condition 2 tin đồng thời cùng update dùng $set cũ value)
+    //    + tách riêng $set cho các field chỉ cập nhật 1 lần (guestName/guestEmail/guestPhone)
+    const incOps: Record<string, any> = { customerMessagesCount: 1 }
+    const setOnlyOnce: Record<string, any> = { lastCustomerMessageAt: now }
+    if (dto.guestName && !session.guestName) setOnlyOnce.guestName = dto.guestName.trim()
+    if (dto.guestEmail && !session.guestEmail) setOnlyOnce.guestEmail = dto.guestEmail.trim()
+    if (dto.guestPhone && !session.guestPhone) setOnlyOnce.guestPhone = dto.guestPhone.trim()
+    // Atomic update: $inc + $set chạy cùng 1 truy vấn, MongoDB độc lập tăng counter tự động khóa row
+    await this.chatSessionModel.updateOne(
+      { _id: sessionId },
+      {
+        $inc: incOps,
+        $set: setOnlyOnce,
+      },
+    )
 
     // Nếu đã escalate cho staff thì bot không tự trả lời nữa
     if (session.status === 'ESCALATED') {
@@ -123,25 +321,80 @@ export class ChatService {
 
     await this.saveMessage(sessionId, 'USER', dto.message, now)
 
-    const contents: Content[] = await this.getHistoryForModel(sessionId)
+    // ✅ A2 + A4: Early guard - nếu KEY invalid → skip hoàn toàn AI loop, trực tiếp escalate 0s delay (không cho user chờ 20s rồi mới báo lỗi)
+    const apiKeyOk = Boolean((process.env.GEMINI_API_KEY || '').trim()) && !(process.env.GEMINI_API_KEY as string).includes('xxx')
+    const aiStartedAt = Date.now()
+    if (!apiKeyOk) {
+      this.logger.error(`[CHAT-AI] [S=${sessionId}] Bỏ qua loop AI vì GEMINI_API_KEY chưa cấu hình hợp lệ → escalate cho nhân viên ngay.`)
+      const fallbackReason = `Bot AI bị tạm ngưng do lỗi cấu hình`
+      await this.doEscalate(sessionId, session, fallbackReason, null, now)
+      const friendly = this.aiFailureToCustomerMessage('api_key_missing_or_invalid')
+      const m = await this.saveMessage(sessionId, 'ASSISTANT', friendly)
+      this.gateway.emitNewMessage(sessionId, this.serializeMessage(m))
+      return { sessionId, status: 'ESCALATED' as ChatStatus, reply: friendly, assignedStaffName: null }
+    }
 
+    // (b) Khởi tạo vòng lặp AI + helper escalate dùng chung (bỏ trùng 4 chỗ)
     let loops = 0
     let escalated = false
     let escalationReason = ''
+    const initHistory: any[] = []
+    const sessAny = session as any
+    if (sessAny.aiHistory && Array.isArray(sessAny.aiHistory) && sessAny.aiHistory.length > 0) {
+      initHistory.push(...(sessAny.aiHistory as any[]))
+    }
+    const customerPrompt = `Khách: ${dto.message}`
+    initHistory.push({
+      role: 'user',
+      parts: [{ text: customerPrompt }],
+    })
+    const contents: any[] = [...initHistory]
+
+    // Helper DRY: TẤT CẢ path escalate đều dùng này → KHÔNG bỏ sót push notif cho staff nữa
+    const escalateWithPushNotif = async (reason: string, fallbackMessageForCustomer: string) => {
+      await this.doEscalate(sessionId, session, reason, null, now)
+      // Luôn luôn push notif cho staff (tất cả case escalate từ AI path - không bỏ sót)
+      try {
+        await this.broadcastStaffNotification({
+          type: session.assignedTo ? 'chat_new_customer_message' : 'chat_sla_pickup_breached_unassigned',
+          priority: 'high',
+          title: session.assignedTo ? '📩 Khách hàng chờ phản hồi - AI đã escalate' : '🤖 AI BOT ĐÃ TỰ ESCALATE - khách chờ hỗ trợ',
+          body: `Lý do: ${this.truncate(reason, 110)} - Khách ${this.guestLabel(session)} hỏi: "${this.truncate(dto.message, 60)}"`,
+          actionUrl: `/admin/customer-chat/${sessionId}`,
+          entityType: 'chat_session',
+          entityId: sessionId,
+          now,
+        })
+      } catch (e) {
+        this.logger.warn(`Escalate from AI path push notif failed: ${(e as Error).message}`)
+      }
+      if (fallbackMessageForCustomer?.trim()) {
+        const fm = await this.saveMessage(sessionId, 'ASSISTANT', fallbackMessageForCustomer.trim())
+        this.gateway.emitNewMessage(sessionId, this.serializeMessage(fm))
+      }
+    }
 
     while (loops < MAX_TOOL_LOOPS) {
       loops++
+      // ✅ A2: Giới hạn TỔNG thời gian xử lý AI (sum tất cả tool loops) ≤ 45s
+      if (Date.now() - aiStartedAt > OVERALL_AI_TIMEOUT_MS) {
+        this.logger.warn(`[CHAT-AI] [S=${sessionId}] ⏱ Tổng thời gian AI vượt quá ${OVERALL_AI_TIMEOUT_MS}ms → escalate nhân viên.`)
+        escalationReason = `Bot phản hồi quá lâu (>${Math.round(OVERALL_AI_TIMEOUT_MS / 1000)}s), tự động chuyển nhân viên`
+        break
+      }
       let response
       try {
         response = await this.callGeminiWithRetry(contents)
       } catch (err) {
-        this.logger.error(`Gemini API error: ${(err as Error).message}`)
-        const friendly = this.isRateLimitError(err)
-          ? 'Hệ thống đang có nhiều người hỏi cùng lúc, bạn vui lòng đợi khoảng 1 phút rồi gửi lại tin nhắn nhé.'
-          : 'Xin lỗi, hệ thống đang gặp sự cố. Bạn vui lòng thử lại sau ít phút.'
-        const m = await this.saveMessage(sessionId, 'ASSISTANT', friendly)
-        this.gateway.emitNewMessage(sessionId, this.serializeMessage(m))
-        return { sessionId, status: session.status, reply: friendly }
+        const kind = this.classifyGeminiError(err)
+        this.logger.error(`[CHAT-AI] [S=${sessionId}] ❌ Loop=${loops} AI failed kind=${kind}: ${(err as Error).message}`)
+        // ✅ A3 + A4: TẤT CẢ loại lỗi (trừ rate-limit đã retry 2 lần rồi) → tự ĐỔI TRẠNG THÁI ESCALATED luôn
+        //    + ghi chi tiết reason (không để session status=OPEN nhưng bot chết)
+        //    + push notif URGENT cho staff (lỗi AI → khách chờ)
+        escalationReason = `AI bot gặp lỗi loại ${kind}: ${this.truncate(String((err as Error).message || ''), 80)}`
+        const friendly = this.aiFailureToCustomerMessage(kind)
+        await escalateWithPushNotif(escalationReason, friendly)
+        return { sessionId, status: 'ESCALATED' as ChatStatus, reply: friendly, assignedStaffName: null }
       }
 
       const functionCalls = response.functionCalls ?? []
@@ -158,10 +411,42 @@ export class ChatService {
       const responseParts: Part[] = []
       for (const call of functionCalls) {
         const args = call.args ?? {}
-        const result = await this.tools.execute(call.name!, args)
+        // ✅ AI-0: WRAP tools.execute với try-catch riêng từng tool (1 tool fail → không sập toàn loop)
+        let result: any
+        try {
+          result = await this.tools.execute(call.name!, args)
+        } catch (toolErr) {
+          const toolErrMsg = (toolErr as Error)?.message || String(toolErr)
+          this.logger.error(`[CHAT-AI] [S=${sessionId}] ❌ Tool ${call.name} THREW ERROR: ${toolErrMsg}`)
+          // Tool lỗi → đánh dấu cần escalate (đừng sập cả loop AI), trả kết quả lỗi định dạng cho Gemini biết tool thất bại
+          escalated = true
+          escalationReason = `Tool ${call.name} bị lỗi: ${this.truncate(toolErrMsg, 90)}`
+          result = {
+            needEscalate: true,
+            escalateReason: escalationReason,
+            fallbackMessage: '⚠️ Xin lỗi, tính năng tra cứu này hiện đang tạm khóa. Mình đã báo đội ngũ kỹ thuật và chuyển bạn cho nhân viên hỗ trợ trực tiếp nhé 🙏',
+            error: true,
+            toolName: call.name,
+          }
+          // Đồng thời lưu 1 tin SYSTEM tool fail cho staff xem chi tiết (không show cho khách)
+          await this.saveMessage(sessionId, 'SYSTEM', `[Tool log: ${call.name}] THẤT BẠI: ${this.truncate(toolErrMsg, 220)}`, now, { system: true })
+        }
         if (call.name === 'escalateToStaff') {
           escalated = true
           escalationReason = (args as any).reason ?? 'Khách yêu cầu hỗ trợ thêm'
+        }
+        // ✅ H3: Tool trả về needEscalate=true (getBookingStatus/checkAvailability không nối được service thật)
+        //     → tự động escalate thay vì chờ Gemini vòng 2
+        if (result && typeof result === 'object' && (result as any).needEscalate === true) {
+          escalated = true
+          const r = result as any
+          escalationReason = r.escalateReason
+            ?? `Bot không thể xử lý ${call.name} yêu cầu của khách (cần nhân viên)`
+          if (r.fallbackMessage && typeof r.fallbackMessage === 'string') {
+            // Gửi luôn fallback message thân thiện cho khách (thay vì chờ nhân viên)
+            const fmM = await this.saveMessage(sessionId, 'ASSISTANT', String(r.fallbackMessage))
+            this.gateway.emitNewMessage(sessionId, this.serializeMessage(fmM))
+          }
         }
         responseParts.push({
           functionResponse: { name: call.name!, response: { result } },
@@ -172,10 +457,8 @@ export class ChatService {
       contents.push({ role: 'user', parts: responseParts })
 
       if (escalated) {
-        await this.doEscalate(sessionId, session, escalationReason, null, now)
         const reply = `Mình đã chuyển yêu cầu của bạn cho nhân viên hỗ trợ (lý do: ${escalationReason}). Bạn vui lòng chờ trong giây lát nhé.`
-        const m = await this.saveMessage(sessionId, 'ASSISTANT', reply)
-        this.gateway.emitNewMessage(sessionId, this.serializeMessage(m))
+        await escalateWithPushNotif(escalationReason, reply)
         return {
           sessionId,
           status: 'ESCALATED' as ChatStatus,
@@ -185,12 +468,11 @@ export class ChatService {
       }
     }
 
-    // Vượt quá tool loop -> an toàn escalate
-    const fallbackReason = 'Cần nhân viên hỗ trợ yêu cầu này'
-    await this.doEscalate(sessionId, session, fallbackReason, null, now)
+    // Vượt quá tool loop (MAX_TOOL_LOOPS) HOẶC break do tổng timeout 45s
+    // ✅ AI-1: Trước đây KHÔNG push notif → sửa dùng escalateWithPushNotif như mọi case khác
+    const fallbackReason = escalationReason || 'Cần nhân viên hỗ trợ yêu cầu này (vượt giới hạn tool AI / timeout)'
     const fallback = 'Xin lỗi, mình cần nhân viên hỗ trợ thêm cho yêu cầu này. Bạn vui lòng chờ trong giây lát.'
-    const m = await this.saveMessage(sessionId, 'ASSISTANT', fallback)
-    this.gateway.emitNewMessage(sessionId, this.serializeMessage(m))
+    await escalateWithPushNotif(fallbackReason, fallback)
     return { sessionId, status: 'ESCALATED' as ChatStatus, reply: fallback, assignedStaffName: null }
   }
 
@@ -222,13 +504,80 @@ export class ChatService {
     const sortOrderVal = q.sortOrder === 'asc' ? 1 : -1
     const sort = { [sortBy]: sortOrderVal, updatedAt: -1 }
 
-    const [items, total] = await Promise.all([
-      this.chatSessionModel.find(filter).sort(sort as any).skip(skip).limit(limit).lean().exec(),
-      this.chatSessionModel.countDocuments(filter).exec(),
-    ])
+    let itemsSerialized: any[]
+    let total: number
 
-    let itemsSerialized = items.map((x) => this.serializeSession(x))
-    if (q.slaBreachedOnly) itemsSerialized = itemsSerialized.filter((s: any) => s.slaStatus !== 'within_sla')
+    // ✅ L5: Fix sai logic slaBreachedOnly filter SAU khi limit 20 → bỏ sót breached chat ở page sau.
+    //    Chia 2 path:
+    //    - Path 1 (nhanh): slaBreachedOnly=false → find + skip/limit như cũ (90% case thường dùng)
+    //    - Path 2 (chính xác): slaBreachedOnly=true → Aggregate tính breach như M4, $match breached=true rồi sort+skip+limit
+    if (!q.slaBreachedOnly) {
+      const [rawItems, totalVal] = await Promise.all([
+        this.chatSessionModel.find(filter).sort(sort as any).skip(skip).limit(limit).lean().exec(),
+        this.chatSessionModel.countDocuments(filter).exec(),
+      ])
+      itemsSerialized = await Promise.all(rawItems.map((x) => this.serializeSession(x)))
+      total = totalVal
+    } else {
+      const breachStage = {
+        $cond: {
+          if: { $eq: ['$status', 'CLOSED'] },
+          then: false, // CLOSED ko tính breach trong list
+          else: {
+            $cond: {
+              if: {
+                $and: [
+                  { $eq: ['$status', 'ESCALATED'] },
+                  { $ne: ['$escalatedAt', null] },
+                  { $eq: ['$firstResponseAt', null] },
+                  { $gt: [{ $subtract: ['$$NOW', '$escalatedAt'] }, CHAT_SLA_PICKUP_SECONDS * 1000] },
+                ],
+              },
+              then: true, // breach pickup
+              else: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $ne: ['$firstResponseAt', null] },
+                      { $ne: ['$lastCustomerMessageAt', null] },
+                      {
+                        $or: [
+                          { $gt: ['$lastCustomerMessageAt', { $ifNull: ['$lastStaffMessageAt', new Date(0)] }] },
+                          { $eq: ['$lastStaffMessageAt', null] },
+                        ],
+                      },
+                      { $gt: [{ $subtract: ['$$NOW', '$lastCustomerMessageAt'] }, CHAT_SLA_REPLY_SECONDS * 1000] },
+                    ],
+                  },
+                  then: true, // breach reply
+                  else: false,
+                },
+              },
+            },
+          },
+        },
+      }
+      const basePipeline: any[] = [
+        { $match: filter },
+        { $project: { doc: '$$ROOT', breached: breachStage } },
+        { $match: { breached: true } },
+      ]
+      // Count total records match (trước skip limit)
+      const [countRow] = await this.chatSessionModel.aggregate<any>([
+        ...basePipeline,
+        { $count: 'count' },
+      ]).exec()
+      total = countRow?.count ?? 0
+
+      const rawRows = await this.chatSessionModel.aggregate<any>([
+        ...basePipeline,
+        { $replaceRoot: { newRoot: '$doc' } }, // restore toàn bộ document cho serializeSession
+        { $sort: sort as any },
+        { $skip: skip },
+        { $limit: limit },
+      ]).exec()
+      itemsSerialized = await Promise.all(rawRows.map((x) => this.serializeSession(x)))
+    }
 
     return { items: itemsSerialized, total, page, limit }
   }
@@ -254,7 +603,7 @@ export class ChatService {
     const assignedStaff = session.assignedTo ? await this.users.findById(this.toOid(session.assignedTo).toHexString()) : null
 
     return {
-      session: this.serializeSession(session, { assignedStaffName: assignedStaff ? assignedStaff.name : null }),
+      session: await this.serializeSession(session, { assignedStaffName: assignedStaff ? assignedStaff.name : null }),
       messages: messages.map((m) => this.serializeMessage(m)),
     }
   }
@@ -264,12 +613,29 @@ export class ChatService {
     const session = await this.chatSessionModel.findById(sessionId)
     if (!session) throw new NotFoundException('Session không tồn tại')
 
+    // ✅ AUD-CR1: KIỂM TRA OWNERSHIP — KHÔNG cho staff khác reply chat KHÔNG của mình (trừ ADMIN quyền hệ thống)
+    const caller = await this.users.findById(staffUserId)
+    if (!caller) throw new ForbiddenException('Tài khoản nhân viên không tồn tại.')
+    const callerRole = ((caller as any).role as UserRole) || 'staff'
+    const assignedOid = session.assignedTo ? String(this.toOid(session.assignedTo).toHexString()) : null
+    const callerOid = String(this.toOid(staffUserId).toHexString())
+    if (callerRole !== 'admin') {
+      // Có người khác đã sở hữu → chặn hoàn toàn (chỉ assigned owner hoặc admin được reply)
+      if (assignedOid && assignedOid !== callerOid) {
+        throw new ForbiddenException(
+          `Bạn không sở hữu chat này (đang được nhân viên khác xử lý). Vui lòng không can thiệp chat của đồng nghiệp.`,
+        )
+      }
+    }
+
     // Nếu session chưa ESCALATED → tự động escalate (staff muốn can thiệp chat BOT)
     let autoEscalated = false
     if (session.status === 'BOT') {
       session.status = 'ESCALATED'
       session.escalationReason = session.escalationReason ?? 'Nhân viên chủ động hỗ trợ khách'
       session.escalatedAt = now
+      // ✅ H2: Đánh dấu auto-escalate (không đưa vào avg firstResponse KPI)
+      ;(session as any).autoEscalatedByStaff = true
       autoEscalated = true
     }
     if (session.status === 'CLOSED') throw new BadRequestException('Session đã đóng, không thể trả lời. Mở lại session trước.')
@@ -281,19 +647,51 @@ export class ChatService {
       session.assignedAt = now
     }
     // Đặt firstResponseAt (lần đầu staff reply)
+    const firstResponsePatch: Record<string, any> = {}
     if (session.status === 'ESCALATED' && !session.firstResponseAt) {
-      session.firstResponseAt = now
+      firstResponsePatch.firstResponseAt = now
       if (session.escalatedAt) {
-        session.firstResponseSeconds = Math.max(0, Math.floor((now.getTime() - new Date(session.escalatedAt).getTime()) / 1000))
+        if ((session as any).autoEscalatedByStaff) {
+          firstResponsePatch.firstResponseSeconds = null
+        } else {
+          firstResponsePatch.firstResponseSeconds = Math.max(
+            0,
+            Math.floor((now.getTime() - new Date(session.escalatedAt).getTime()) / 1000),
+          )
+        }
       }
       isFirstResponse = true
     }
 
-    session.staffMessagesCount = (session.staffMessagesCount || 0) + 1
-    session.lastStaffMessageAt = now
-    await session.save()
+    // ✅ AI-2: Thay vì `session.save()` (không atomic) → dùng updateOne atomic $set + $inc
+    //   - Tất cả session field được update (status, assignedTo, escalated, firstResponseAt...)
+    //   - staffMessagesCount dùng $inc 1 đơn vị (không race condition)
+    const atomicPatch: Record<string, any> = {
+      lastStaffMessageAt: now,
+      ...(autoEscalated
+        ? {
+            status: 'ESCALATED',
+            escalatedAt: now,
+            escalationReason: session.escalationReason ?? 'Nhân viên chủ động hỗ trợ khách',
+            autoEscalatedByStaff: true,
+          }
+        : {}),
+      ...(session.assignedTo ? {} : { assignedTo: this.toOid(staffUserId), assignedAt: now }),
+      ...firstResponsePatch,
+    }
+    await this.chatSessionModel.updateOne(
+      { _id: sessionId },
+      {
+        $set: atomicPatch,
+        $inc: { staffMessagesCount: 1 },
+      },
+    )
+    // Đồng bộ lại object session cho các chỗ tham chiếu sau (serialization, notif create etc)
+    Object.assign(session, atomicPatch, {
+      staffMessagesCount: (session.staffMessagesCount || 0) + 1,
+    })
 
-    const m = await this.saveMessage(sessionId, 'STAFF', message, now)
+    const m = await this.saveMessage(sessionId, 'STAFF', message, now, { createdByStaffId: staffUserId })
 
     // Broadcast realtime tới room (customer widget nhận tin ngay lập tức)
     this.gateway.emitNewMessage(sessionId, this.serializeMessage(m))
@@ -363,7 +761,7 @@ export class ChatService {
       senderUserId: this.toOid(actor.sub),
       now,
     })
-    return this.serializeSession(session, { assignedStaffName: targetStaff.name })
+    return await this.serializeSession(session, { assignedStaffName: targetStaff.name })
   }
 
   async claimSession(sessionId: string, actor: { sub: string; role: UserRole }) {
@@ -384,7 +782,7 @@ export class ChatService {
     await session.save()
 
     this.gateway.emitSessionUpdated(session.id, { assignedTo: session.assignedTo, assignedAt: session.assignedAt, assignedStaffName: staff?.name ?? null, status: session.status })
-    return this.serializeSession(session, { assignedStaffName: staff?.name ?? null })
+    return await this.serializeSession(session, { assignedStaffName: staff?.name ?? null })
   }
 
   async updateStatus(dto: UpdateSessionStatusDto, actor: { sub: string; role: UserRole }, now = new Date()) {
@@ -402,20 +800,20 @@ export class ChatService {
     }
     await session.save()
     this.gateway.emitSessionUpdated(session.id, { status: session.status, closedAt: session.closedAt, closedReason: session.closedReason })
-    return this.serializeSession(session)
+    return await this.serializeSession(session)
   }
 
   async escalateByStaff(sessionId: string, reason: string, actor: { sub: string; role: UserRole }, now = new Date()) {
     if (actor.role !== 'staff' && actor.role !== 'admin') throw new ForbiddenException('Thiếu quyền.')
     const session = await this.chatSessionModel.findById(sessionId)
     if (!session) throw new NotFoundException('Session không tồn tại')
-    if (session.status === 'ESCALATED') return this.serializeSession(session)
+    if (session.status === 'ESCALATED') return await this.serializeSession(session)
     session.status = 'ESCALATED'
     session.escalationReason = reason
     session.escalatedAt = now
     session.escalatedByStaffId = this.toOid(actor.sub)
     await session.save()
-    const ser = this.serializeSession(session)
+    const ser = await this.serializeSession(session)
     this.gateway.emitSessionUpdated(sessionId, { status: 'ESCALATED', escalatedAt: now, escalationReason: reason })
     // Broadcast notif staff/admin
     await this.broadcastStaffNotification({
@@ -466,7 +864,7 @@ export class ChatService {
       senderUserId: this.toOid(actor.sub),
       now,
     })
-    return this.serializeSession(session, { assignedStaffName: target.name })
+    return await this.serializeSession(session, { assignedStaffName: target.name })
   }
 
   async chatDashboardStats(q: ChatStatsDto) {
@@ -493,35 +891,57 @@ export class ChatService {
       this.chatSessionModel.countDocuments({ status: 'ESCALATED', assignedTo: { $ne: null }, ...(from || to ? createdFilter : {}) }).exec(),
       this.chatSessionModel.countDocuments({ status: 'CLOSED', closedAt: { $gte: todayStart } }).exec(),
       this.chatSessionModel.countDocuments({ ...(from || to ? createdFilter : {}) }).exec(),
+      // ✅ M4: Breach pickup/reply TÍNH BẰNG AGGREGATE (hỗ trợ N triệu records, không giới hạn 1000)
+      //    Loại bỏ $limit 1000 JS duyệt filter → dùng $expr + $cond tính breach
       this.chatSessionModel.aggregate<any>([
         { $match: { status: { $in: ['ESCALATED'] }, escalatedAt: { $ne: null } } },
         {
           $project: {
             _id: 1,
-            escalatedAt: 1,
-            firstResponseAt: 1,
-            lastCustomerMessageAt: 1,
-            lastStaffMessageAt: 1,
-            assignedTo: 1,
-          }
+            breached: {
+              $cond: {
+                if: {
+                  // CASE 1: chưa có firstResponse → kiểm tra breach pickup (> 5 phút kể từ escalatedAt)
+                  $and: [
+                    { $eq: ['$firstResponseAt', null] },
+                    { $gt: [{ $subtract: ['$$NOW', '$escalatedAt'] }, CHAT_SLA_PICKUP_SECONDS * 1000] },
+                  ],
+                },
+                then: true,
+                // CASE 2: đã reply ít nhất 1 lần → kiểm tra breach reply (> 3 phút kể từ tin KH cuối chưa trả lời)
+                else: {
+                  $cond: {
+                    if: {
+                      $and: [
+                        { $ne: ['$lastCustomerMessageAt', null] },
+                        // lastCustomer nằm SAU lastStaff (hoặc chưa có lastStaff) → chưa trả lời tin KH cuối
+                        {
+                          $or: [
+                            { $gt: ['$lastCustomerMessageAt', { $ifNull: ['$lastStaffMessageAt', new Date(0)] }] },
+                            { $eq: ['$lastStaffMessageAt', null] },
+                          ],
+                        },
+                        // thời gian tính từ tin KH cuối đến bây giờ > SLA_REPLY_SECONDS
+                        { $gt: [{ $subtract: ['$$NOW', '$lastCustomerMessageAt'] }, CHAT_SLA_REPLY_SECONDS * 1000] },
+                      ],
+                    },
+                    then: true,
+                    else: false,
+                  },
+                },
+              },
+            },
+          },
         },
-        { $limit: 1000 },
-      ]).exec().then((rows: any[]) => {
-        const nowT = Date.now()
-        return rows.filter((r) => {
-          // Breach pickup: escalated + chưa firstResponse + quá 5phút
-          if (!r.firstResponseAt && r.escalatedAt) {
-            const diff = (nowT - new Date(r.escalatedAt).getTime()) / 1000
-            if (diff > CHAT_SLA_PICKUP_SECONDS) return true
-          }
-          return false
-        }).length
-      }),
+        { $match: { breached: true } },
+        { $count: 'count' },
+      ]).exec().then((rows: any[]) => (rows[0]?.count ?? 0)),
     ])
 
     // TB first response của các session đã đóng trong ngày hôm nay
+    // ✅ H2: Bỏ qua các session autoEscalatedByStaff=true (staff chủ động can thiệp chat BOT → firstResponse không có ý nghĩa KPI)
     const avgFirstResponse = await this.chatSessionModel.aggregate<any>([
-      { $match: { status: 'CLOSED', firstResponseSeconds: { $gte: 0 } } },
+      { $match: { status: 'CLOSED', firstResponseSeconds: { $ne: null, $gte: 0 }, autoEscalatedByStaff: { $ne: true } } },
       ...(from || to ? [{ $match: { closedAt: { $gte: from, $lte: to } } }] : [{ $match: { closedAt: { $gte: todayStart } } }]),
       { $group: { _id: null, avg: { $avg: '$firstResponseSeconds' }, total: { $sum: 1 } } },
       { $limit: 1 },
@@ -581,7 +1001,8 @@ export class ChatService {
       this.chatSessionModel.countDocuments(baseMatchAssigned).exec(),
       this.chatSessionModel.countDocuments({ assignedTo: this.toOid(staffUserId), status: 'CLOSED', ...(from || to ? { closedAt: { $gte: from, $lte: to } } : {}) }).exec(),
       this.chatSessionModel.aggregate<any>([
-        { $match: { assignedTo: this.toOid(staffUserId), firstResponseSeconds: { $gte: 0 } } },
+        // ✅ H2: Staff KPI avgFirstResponse cũng lọc bỏ autoEscalatedByStaff (tương tự dashboard)
+        { $match: { assignedTo: this.toOid(staffUserId), firstResponseSeconds: { $ne: null, $gte: 0 }, autoEscalatedByStaff: { $ne: true } } },
         ...(from || to ? [{ $match: { firstResponseAt: { $gte: from, $lte: to } } }] : []),
         { $group: { _id: null, avg: { $avg: '$firstResponseSeconds' }, n: { $sum: 1 } } },
         { $limit: 1 },
@@ -599,7 +1020,80 @@ export class ChatService {
         firstResponseSeconds: { $gt: CHAT_SLA_PICKUP_SECONDS },
         ...(from || to ? { escalatedAt: { $gte: from, $lte: to } } : {}),
       }).exec(),
-      Promise.resolve(0), // TODO: breachedReply sẽ tính aggregate (tin khách gửi -> staff reply), để phase sau
+      // ✅ M5: breachedReplyCount KHÔNG hardcode 0 nữa
+      // Tính bằng ChatMessage aggregate: mỗi lần customer gửi tin -> staff reply đó, nếu gap > 180s → breach 1 lần
+      this.chatMessageModel.aggregate<any>([
+        // 1) B1: Lọc những tin KHỎI tạo ra trong phạm vi staff này, có createdAt đúng khoảng thời gian
+        {
+          $match: {
+            role: 'CUSTOMER' as any,
+            $or: [{ system: { $ne: true } }, { system: null }],
+            ...(from || to ? { createdAt: { $gte: from, ...(to ? { $lte: to } : {}) } } : {}),
+          },
+        },
+        // 2) Tìm tin NHÂN VIÊN (role STAFF) sắp tới trong cùng sessionId, ngay sau tin customer đó
+        {
+          $lookup: {
+            from: 'chat_messages',
+            let: { sId: '$sessionId', custAt: '$createdAt' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$sessionId', '$$sId'] },
+                      { $gt: ['$createdAt', '$$custAt'] },
+                      { $or: [{ $eq: ['$role', 'STAFF'] }, { $eq: ['$role', 'ASSISTANT_STAFF'] }] },
+                    ],
+                  },
+                },
+              },
+              { $sort: { createdAt: 1 } },
+              { $limit: 1 },
+              { $project: { createdAt: 1, createdByStaffId: 1 } },
+            ],
+            as: 'staffReply',
+          },
+        },
+        { $unwind: { path: '$staffReply', preserveNullAndEmptyArrays: false } },
+        // 3) Kiểm tra: staff reply đó có thuộc staff đang tính KPI không?
+        //    Option A: tạo tin có createdByStaffId == staffUserId
+        //    Option B (backup): tìm session nào assignedTo staffUserId (bảo toàn nếu field createdByStaffId null ở dữ liệu cũ)
+        {
+          $lookup: {
+            from: 'chat_sessions',
+            let: { sessId: '$sessionId' },
+            pipeline: [
+              { $match: { $expr: { $eq: ['$_id', '$$sessId'] } } },
+              { $project: { assignedTo: 1, _id: 0 } },
+              { $limit: 1 },
+            ],
+            as: 'sessionOwner',
+          },
+        },
+        { $unwind: { path: '$sessionOwner', preserveNullAndEmptyArrays: true } },
+        {
+          $match: {
+            $expr: {
+              $or: [
+                { $eq: ['$staffReply.createdByStaffId', this.toOid(staffUserId)] },
+                { $eq: ['$sessionOwner.assignedTo', this.toOid(staffUserId)] },
+              ],
+            },
+          },
+        },
+        // 4) Tính thời gian chờ (replySeconds) và đếm số lượng lớn hơn SLA_REPLY_SECONDS
+        {
+          $project: {
+            _id: 0,
+            replySeconds: {
+              $divide: [{ $subtract: ['$staffReply.createdAt', '$createdAt'] }, 1000],
+            },
+          },
+        },
+        { $match: { replySeconds: { $gt: CHAT_SLA_REPLY_SECONDS } } },
+        { $count: 'count' },
+      ]).exec().then((rows: any[]) => (rows[0]?.count ?? 0)),
     ])
 
     return {
@@ -620,18 +1114,87 @@ export class ChatService {
   // PHASE 3 - Rating + Thank You Voucher + Auto Close
   // ==========================================================
 
-  async submitRating(dto: SubmitRatingDto, now = new Date()) {
+  // ✅ M2: Phương thức cập nhật thông tin khách vãng lai - lưu vào session fields, KHÔNG tạo ChatMessage mới
+  async updateGuestInfo(dto: UpdateGuestInfoDto, now = new Date()) {
     const session = await this.chatSessionModel.findById(dto.sessionId)
     if (!session) throw new NotFoundException('Session không tồn tại')
-    if (dto.guestEmail && session.guestEmail && dto.guestEmail.trim().toLowerCase() !== session.guestEmail.trim().toLowerCase()) {
+    if (session.status === 'CLOSED') {
+      throw new BadRequestException('Session đã đóng, không thể cập nhật thông tin khách nữa.')
+    }
+    let changed = false
+    if (dto.guestName && !session.guestName) {
+      session.guestName = dto.guestName.trim()
+      changed = true
+    }
+    if (dto.guestEmail && !session.guestEmail) {
+      session.guestEmail = dto.guestEmail.trim()
+      changed = true
+    }
+    if (dto.guestPhone && !session.guestPhone) {
+      session.guestPhone = dto.guestPhone.trim()
+      changed = true
+    }
+    if (!changed) {
+      return {
+        updated: false,
+        session: await this.serializeSession(session),
+      }
+    }
+    await session.save()
+    const serSession = await this.serializeSession(session)
+    // ✅ Emit realtime để staff bên AdminChatDetail thấy ngay thông tin khách đã cập nhật (không cần F5)
+    this.gateway.emitSessionUpdated(session.id, {
+      guestName: serSession.guestName,
+      guestEmail: serSession.guestEmail,
+      guestPhone: serSession.guestPhone,
+    })
+    return {
+      updated: true,
+      session: serSession,
+    }
+  }
+
+  async submitRating(dto: SubmitRatingDto, now = new Date()) {
+    // Kiểm tra session tồn tại + guestEmail match (email sai → throw trước)
+    const checkSession = await this.chatSessionModel
+      .findById(dto.sessionId)
+      .select('_id guestEmail assignedTo ratingStars guestName guestPhone userId escalatedAt status')
+      .exec()
+    if (!checkSession) throw new NotFoundException('Session không tồn tại')
+    if (
+      dto.guestEmail &&
+      checkSession.guestEmail &&
+      dto.guestEmail.trim().toLowerCase() !== checkSession.guestEmail.trim().toLowerCase()
+    ) {
       throw new BadRequestException('Email xác nhận không khớp.')
     }
-    if (session.ratingStars) throw new BadRequestException('Session đã được đánh giá trước đó.')
-    session.ratingStars = dto.ratingStars
-    session.ratingComment = dto.ratingComment?.trim() || null
-    session.ratedAt = now
-    await session.save()
-    this.gateway.emitSessionUpdated(session.id, { ratingStars: dto.ratingStars, ratingComment: session.ratingComment, ratedAt: now })
+
+    // ✅ AUD-H1: Dùng findOneAndUpdate ATOMIC thay vì findById + if(ratingStars?) throw + save()
+    //   → Chống race-condition 2 request đồng thời cùng đọc ratingStars=null → cả 2 pass → ghi 2 lần (double notif)
+    //   Condition: _id = dto.sessionId VÀ ratingStars = null (hoặc undefined) → set 1 lần DUY NHẤT atomic
+    const atomicUpdated = await this.chatSessionModel.findOneAndUpdate(
+      { _id: dto.sessionId, ratingStars: null },
+      {
+        $set: {
+          ratingStars: dto.ratingStars,
+          ratingComment: dto.ratingComment?.trim() || null,
+          ratedAt: now,
+        },
+      },
+      { new: true, runValidators: true, select: '_id ratingStars ratingComment ratedAt assignedTo guestName guestEmail guestPhone userId escalatedAt status' },
+    )
+
+    // Không có document được update → ratingStars đã có giá trị trước đó (người dùng double click)
+    if (!atomicUpdated) {
+      return { ok: false, alreadyRated: true, ratingStars: (checkSession as any).ratingStars ?? dto.ratingStars, message: 'Bạn đã đánh giá cuộc chat này trước đó rồi.' }
+    }
+    // Đồng bộ ref downstream (giống logic cũ để notif + label)
+    const session = atomicUpdated as any
+    this.gateway.emitSessionUpdated(session.id, {
+      ratingStars: dto.ratingStars,
+      ratingComment: session.ratingComment,
+      ratedAt: now,
+    })
 
     // Notify staff assigned
     if (session.assignedTo) {
@@ -752,9 +1315,31 @@ export class ChatService {
 
   private async broadcastStaffNotification(input: Omit<CreateNotificationInput, 'recipientId' | 'recipientRole'> & { onlyAdmin?: boolean }) {
     const role = input.onlyAdmin ? 'admin' : undefined
-    const { items } = await this.users.adminListUsers({ role: role as any, page: 1, limit: 500 })
+    // ✅ H5: Loop qua tất cả các trang users (không dừng ở 500 người đầu tiên)
+    //    - page size = 200 nhỏ gọn để query DB không nặng
+    //    - kết quả allRecipients = gộp hết tất cả staff/admin active
+    const allRecipients: any[] = []
+    let page = 1
+    while (true) {
+      const { items, total }: any = await this.users.adminListUsers({
+        role: role as any,
+        page,
+        limit: 200,
+      })
+      if (!Array.isArray(items) || items.length === 0) break
+      allRecipients.push(...items)
+      // Dừng sớm: trang này không đủ 200 hay đã vượt qua total
+      if (items.length < 200) break
+      if (typeof total === 'number' && allRecipients.length >= total) break
+      page++
+      if (page > 500) {
+        this.logger.warn(`[broadcastStaffNotif] looped 50k+ users unexpectedly, stop to avoid infinite loop`)
+        break
+      }
+    }
+
     const results: any[] = []
-    for (const u of items) {
+    for (const u of allRecipients) {
       if (u.role !== 'admin' && u.role !== 'staff') continue
       if (!u.isActive) continue
       results.push(this.notifications.create({
@@ -837,8 +1422,20 @@ export class ChatService {
     } catch { return 'unknown' }
   }
 
-  private serializeSession(session: ChatSession | any, extra: { assignedStaffName?: string | null } = {}): any {
+  private async serializeSession(session: ChatSession | any, extra: { assignedStaffName?: string | null } = {}): Promise<any> {
     const sla = this.computeSlaStatus(session)
+    // ✅ C3 Fix: Fallback đúng nghĩa nếu caller chưa truyền assignedStaffName
+    //    extra.assignedStaffName có giá trị → dùng (performance)
+    //    không có extra nhưng session.assignedTo có giá trị → query DB lấy tên staff
+    //    không có assignedTo → null (chưa phân công)
+    let fallbackStaffName: string | null = null
+    if (extra.assignedStaffName === undefined || extra.assignedStaffName === null) {
+      if (session.assignedTo) {
+        fallbackStaffName = await this.assignedStaffName(session.assignedTo)
+      }
+    } else {
+      fallbackStaffName = extra.assignedStaffName
+    }
     return {
       id: (session._id ?? session.id)?.toString?.() ?? session.id,
       userId: session.userId ? String(session.userId) : null,
@@ -848,7 +1445,7 @@ export class ChatService {
       status: session.status,
       assignedTo: session.assignedTo ? String(session.assignedTo) : null,
       assignedAt: session.assignedAt ?? null,
-      assignedStaffName: extra.assignedStaffName ?? (session.assignedTo ? null : null),
+      assignedStaffName: fallbackStaffName,
       escalationReason: session.escalationReason ?? null,
       escalatedAt: session.escalatedAt ?? null,
       escalatedByStaffId: session.escalatedByStaffId ? String(session.escalatedByStaffId) : null,
@@ -918,41 +1515,85 @@ export class ChatService {
     })
   }
 
-  private async saveMessage(sessionId: string, role: ChatRole, content: string, createdAt?: Date): Promise<ChatMessage> {
-    const patch: any = { sessionId: this.toOid(sessionId), role, content }
+  private async saveMessage(
+    sessionId: string,
+    role: ChatRole,
+    content: string,
+    createdAt?: Date,
+    opts?: { system?: boolean; createdByStaffId?: string | Types.ObjectId | null },
+  ): Promise<ChatMessage> {
+    const patch: any = {
+      sessionId: this.toOid(sessionId),
+      role,
+      content,
+      system: Boolean(opts?.system),
+    }
     if (createdAt) patch.createdAt = createdAt
+    if (opts?.createdByStaffId) {
+      patch.createdByStaffId = this.toOid(opts.createdByStaffId as any)
+    }
     const doc = new this.chatMessageModel(patch)
     await doc.save()
-    if (role === 'ASSISTANT') {
-      await this.chatSessionModel.updateOne({ _id: sessionId }, { $inc: { botMessagesCount: 1 } })
+    // Atomic counter bot/staff/user trên session
+    try {
+      if (role === 'ASSISTANT') {
+        await this.chatSessionModel.updateOne({ _id: sessionId }, { $inc: { botMessagesCount: 1 } })
+      } else if (role === 'STAFF') {
+        // Note: counter staffMessagesCount atomic được tăng ở staffReply updateOne chính (để đảm bảo 1 lần cho cả 2). Nếu saveMessage STAFF được gọi từ path khác → tăng thêm ở đây cho an toàn.
+      } else if (role === 'USER') {
+        // Note: customerMessagesCount đã atomic tăng ở handleMessage entry.
+      }
+    } catch (e) {
+      this.logger.warn(`[S=${sessionId}] saveMessage atomic counter failed: ${(e as Error).message}`)
     }
     return doc
   }
 
   private async saveToolCall(sessionId: string, toolName: string, args: any, result: any) {
+    // ✅ H1: Lưu với role = SYSTEM (ẩn đi trên UI widget khách) thay vì ASSISTANT (show như tin bot)
+    //    Chỉ hiển thị cho staff/admin ở màn hình detail nếu cần debug tool-calling pipeline
     return this.chatMessageModel.create({
       sessionId: this.toOid(sessionId),
-      role: 'ASSISTANT',
+      role: 'SYSTEM',
       content: `[gọi tool: ${toolName}]`,
       toolCalls: args,
       toolResult: result,
+      system: true, // AI-3b: luôn đánh dấu log tool là system ẩn trên UI widget
     })
   }
 
   private async callGeminiWithRetry(contents: Content[], attempt = 1): Promise<any> {
+    const startedAt = Date.now()
     try {
-      return await this.ai.models.generateContent({
-        model: MODEL,
-        contents,
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          tools: [{ functionDeclarations: CHAT_TOOL_DECLARATIONS }],
-          temperature: 0.3,
-        },
-      })
+      // ✅ A2: Wrap với timeout 20s cho từng generateContent (không cho user chờ quá lâu, dù Google có đang treo)
+      const geminiResp = await this.promiseWithTimeout(
+        this.ai.models.generateContent({
+          model: MODEL,
+          contents,
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            tools: [{ functionDeclarations: CHAT_TOOL_DECLARATIONS }],
+            temperature: 0.3,
+          },
+        }),
+        GEMINI_CALL_TIMEOUT_MS,
+        `attempt_${attempt}`,
+      )
+      const tookMs = Date.now() - startedAt
+      if (tookMs > 5000) {
+        this.logger.warn(`[CHAT-AI] 🐌 Gemini generate xong trong ${tookMs}ms (trên 5s, hơi lâu).`)
+      } else {
+        this.logger.verbose?.(`[CHAT-AI] ✅ Gemini generate ok attempt=${attempt}, ${tookMs}ms`)
+      }
+      return geminiResp
     } catch (err) {
-      if (attempt < 2 && this.isRateLimitError(err)) {
-        await new Promise((r) => setTimeout(r, 2000))
+      const tookMs = Date.now() - startedAt
+      const kind = this.classifyGeminiError(err)
+      this.logger.warn(`[CHAT-AI] ❌ Gemini call FAILED (attempt=${attempt}, ${tookMs}ms, kind=${kind}): ${(err as Error).message}`)
+      if (kind === 'rate_limit' && attempt < 2) {
+        // Chỉ retry 1 lần duy nhất với rate limit (429) sau 1.5s, không retry lại với lỗi khác → giảm chờ đợi
+        this.logger.warn(`[CHAT-AI] ⏱ Rate limit, retry sau ${GEMINI_RATE_LIMIT_RETRY_MS}ms (lần ${attempt + 1}/2)...`)
+        await new Promise((r) => setTimeout(r, GEMINI_RATE_LIMIT_RETRY_MS))
         return this.callGeminiWithRetry(contents, attempt + 1)
       }
       throw err

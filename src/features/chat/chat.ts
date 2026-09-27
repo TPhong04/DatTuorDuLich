@@ -1,5 +1,21 @@
 import { apiFetch } from '@/lib/api'
 
+/**
+ * Lấy x-chat-guest-token từ localStorage nếu có.
+ * Token này được BE trả về khi khách vãng lai gửi tin nhắn đầu tiên (POST /chat/message),
+ * dùng để xác minh chủ sở hữu session ở các public endpoint (GET sessions/:id, POST rating).
+ * Sẽ trả về undefined nếu client đăng nhập (có access token) vì BE đã ưu tiên kiểm tra auth token trước.
+ */
+function readGuestTokenHeader(): Record<string, string> | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const t = window.localStorage.getItem('chat:guestToken')
+    return t ? { 'x-chat-guest-token': t } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 // ============== Types ==============
 
 export type ChatRole = 'USER' | 'ASSISTANT' | 'STAFF' | 'SYSTEM'
@@ -208,11 +224,14 @@ export function customerChatSendMessage(input: {
     status: ChatStatus
     reply: string
     assignedStaffName?: string | null
+    guestToken?: string | null
   }>('/chat/message', { method: 'POST', body: JSON.stringify(input) })
 }
 
 export function customerGetChatSessionInfo(sessionId: string) {
-  return apiFetch<SessionDetailRes>(`/chat/sessions/${sessionId}`)
+  return apiFetch<SessionDetailRes>(`/chat/sessions/${sessionId}`, {
+    headers: readGuestTokenHeader(),
+  })
 }
 
 export function customerSubmitChatRating(input: {
@@ -221,5 +240,27 @@ export function customerSubmitChatRating(input: {
   ratingComment?: string
   guestEmail?: string
 }) {
-  return apiFetch<{ ok: true; ratingStars: number }>('/chat/rating', { method: 'POST', body: JSON.stringify(input) })
+  return apiFetch<{ ok: true; ratingStars: number }>('/chat/rating', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    headers: readGuestTokenHeader(),
+  })
+}
+
+// ✅ M2: Cập nhật thông tin khách vãng lai (PATCH, save vào session fields, KHÔNG tạo tin nhắn mới)
+export function customerUpdateGuestInfo(input: {
+  sessionId: string
+  guestName?: string
+  guestEmail?: string
+  guestPhone?: string
+}) {
+  return apiFetch<{ updated: boolean; session: ChatSession }>(`/chat/sessions/${input.sessionId}/guest-info`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      guestName: input.guestName,
+      guestEmail: input.guestEmail,
+      guestPhone: input.guestPhone,
+    }),
+    headers: readGuestTokenHeader(),
+  })
 }

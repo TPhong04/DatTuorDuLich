@@ -45,6 +45,10 @@ export type NotificationType =
   | 'chat_sla_breached'
   | 'chat_auto_closed'
   | 'chat_rating_received'
+  // ✅ H4: SLA Breach chi tiết theo loại breach (pickup / reply) + unassigned)
+  | 'chat_sla_pickup_breached'
+  | 'chat_sla_reply_breached'
+  | 'chat_sla_pickup_breached_unassigned'
 
 @Schema({ timestamps: true, collection: 'notifications' })
 export class Notification {

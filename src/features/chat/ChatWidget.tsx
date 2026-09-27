@@ -78,17 +78,28 @@ function GuestInfoForm({
     <div className="chat-guest-form flex flex-col gap-3 p-4 text-sm">
       <div className="text-gray-700 font-medium">Để nhân viên hỗ trợ nhanh hơn, vui lòng để lại thông tin:</div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Họ tên <span className="text-rose-500">*</span></label>
+        <label className="block text-xs text-gray-500 mb-1" htmlFor="chat-guest-name">Họ tên <span className="text-rose-500">*</span></label>
         <input
+          id="chat-guest-name"
+          name="guest-name"
+          aria-label="Họ và tên của bạn"
+          autoComplete="name"
+          maxLength={100}
           className="w-full border rounded px-3 py-2 outline-none focus:border-teal-600"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Nguyễn Văn A"
+          required
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Email</label>
+        <label className="block text-xs text-gray-500 mb-1" htmlFor="chat-guest-email">Email</label>
         <input
+          id="chat-guest-email"
+          name="guest-email"
+          aria-label="Địa chỉ email của bạn"
+          autoComplete="email"
+          maxLength={150}
           type="email"
           className="w-full border rounded px-3 py-2 outline-none focus:border-teal-600"
           value={email}
@@ -97,8 +108,14 @@ function GuestInfoForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">Số điện thoại</label>
+        <label className="block text-xs text-gray-500 mb-1" htmlFor="chat-guest-phone">Số điện thoại</label>
         <input
+          id="chat-guest-phone"
+          name="guest-phone"
+          aria-label="Số điện thoại của bạn"
+          autoComplete="tel"
+          inputMode="tel"
+          maxLength={20}
           className="w-full border rounded px-3 py-2 outline-none focus:border-teal-600"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -108,9 +125,10 @@ function GuestInfoForm({
       <div className="text-xs text-gray-500 italic">Cần email hoặc SĐT để liên hệ lại khi cần.</div>
       <button
         type="button"
+        aria-label="Tiếp tục bắt đầu chat với nhân viên hỗ trợ"
         className="bg-teal-700 hover:bg-teal-800 text-white rounded py-2 font-medium disabled:opacity-50"
         disabled={submitting || !name.trim() || (!email.trim() && !phone.trim())}
-        onClick={onSubmit}
+        onClick={onSubmit as any}
       >
         {submitting ? 'Đang xử lý...' : 'Tiếp tục chat với nhân viên'}
       </button>
@@ -161,7 +179,7 @@ function RatingWidget({
       </div>
       {!done ? (
         <>
-          <div className="flex items-center gap-1 my-2 select-none">
+          <div className="flex items-center gap-1 my-2 select-none" role="radiogroup" aria-label="Đánh giá số sao 1-5">
             {[1, 2, 3, 4, 5].map((i) => {
               const filled = i <= (hover || stars)
               return (
@@ -171,7 +189,10 @@ function RatingWidget({
                   onClick={() => setStars(i)}
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(0)}
-                  disabled={submitting || disabled}
+                  disabled={done || submitting || disabled}
+                  role="radio"
+                  aria-checked={stars === i}
+                  aria-label={`${i} sao${filled ? ' đã chọn' : ''}`}
                   className={`text-3xl transition ${filled ? 'text-amber-400' : 'text-gray-300'} disabled:opacity-50`}
                   title={`${i} sao`}
                 >
@@ -188,17 +209,22 @@ function RatingWidget({
             </span>
           </div>
           <textarea
+            id="chat-rating-comment"
+            name="rating-comment"
+            aria-label="Nội dung ý kiến đánh giá của bạn (không bắt buộc)"
+            maxLength={1000}
             className="w-full border rounded px-3 py-2 outline-none text-sm mb-2"
             rows={2}
             placeholder="Nội dung ý kiến (không bắt buộc)..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            disabled={submitting || disabled}
+            disabled={done || submitting || disabled}
           />
           <button
             type="button"
+            aria-label="Gửi đánh giá dịch vụ hỗ trợ khách hàng"
             className="bg-amber-500 hover:bg-amber-600 text-white rounded px-4 py-2 font-medium disabled:opacity-50"
-            disabled={stars < 1 || submitting || disabled}
+            disabled={done || stars < 1 || submitting || disabled}
             onClick={onBtnSubmit}
           >
             {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
@@ -333,12 +359,17 @@ export function ChatWidget() {
       {!isClosed && (
         <form className="chat-composer" onSubmit={handleSubmit}>
           <input
+            id="chat-message-input"
+            name="chat-message"
+            aria-label="Nội dung tin nhắn gửi cho nhân viên hỗ trợ"
+            autoComplete="off"
+            maxLength={2000}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={guestDone ? 'Nhập tin nhắn...' : 'Nhập tin nhắn (nếu cần hỗ trợ ngay)'}
             disabled={isSending}
           />
-          <button type="submit" disabled={isSending || !input.trim()}>
+          <button type="submit" aria-label="Gửi tin nhắn" disabled={isSending || !input.trim()}>
             Gửi
           </button>
         </form>

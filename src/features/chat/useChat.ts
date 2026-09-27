@@ -5,6 +5,7 @@ import {
   customerChatSendMessage,
   customerGetChatSessionInfo,
   customerSubmitChatRating,
+  customerUpdateGuestInfo,
   ChatStatus as ApiStatus,
   ChatRole as ApiRole,
   ChatMessage,
@@ -62,7 +63,12 @@ const fromApiMessage = (m: ChatMessage): ChatMessageItem => ({
   createdAt: m.createdAt,
 })
 
-function useChatSocket(sessionId: string | null | undefined, onNewMessage: (m: ChatMessageItem) => void, onSessionPatch: (patch: Partial<ChatWidgetState>) => void) {
+function useChatSocket(
+  sessionId: string | null | undefined,
+  customerInfo: { name: string | null; email: string | null; phone: string | null },
+  onNewMessage: (m: ChatMessageItem) => void,
+  onSessionPatch: (patch: Partial<ChatWidgetState>) => void,
+) {
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
@@ -77,7 +83,13 @@ function useChatSocket(sessionId: string | null | undefined, onNewMessage: (m: C
     socketRef.current = socket
 
     socket.on('connect', () => {
-      socket.emit('chat:join-room', { sessionId })
+      const guestToken = safeLsGet(LS_KEY_GUEST_TOKEN) || undefined
+      socket.emit('chat:join-room', {
+        sessionId,
+        guestToken,
+        guestEmail: customerInfo.email || undefined,
+        guestPhone: customerInfo.phone || undefined,
+      })
     })
 
     socket.on('chat:new-message', (payload: any) => {
@@ -115,38 +127,91 @@ function useChatSocket(sessionId: string | null | undefined, onNewMessage: (m: C
   return socketRef
 }
 
+/**
+ * ✅ C4: LocalStorage keys để persist session của widget
+ *     khách không bị mất chat khi F5 / đóng-mở lại tab
+ */
+const LS_KEY_SESSION_ID = 'chat:sessionId'
+const LS_KEY_GUEST_TOKEN = 'chat:guestToken'
+const LS_KEY_GUEST_INFO = 'chat:guestInfo'
+
+function safeLsGet(key: string): string | null {
+  try { return typeof window !== 'undefined' ? window.localStorage.getItem(key) : null } catch { return null }
+}
+function safeLsSet(key: string, val: string | null) {
+  try {
+    if (typeof window === 'undefined') return
+    if (val == null) window.localStorage.removeItem(key)
+    else window.localStorage.setItem(key, val)
+  } catch { /* ignore - e.g. Safari private mode */ }
+}
+
 export function useChat(initialSessionId?: string | null, initialGuestInfo?: { name?: string | null; email?: string | null; phone?: string | null }) {
-  const [state, setState] = useState<ChatWidgetState>(() => ({
-    messages: [],
-    status: 'BOT',
-    isSending: false,
-    assignedStaffName: null,
-    escalationReason: null,
-    ratingStars: null,
-    ratingComment: null,
-    ratedAt: null,
-    closedAt: null,
-    sessionId: initialSessionId ?? null,
-    slaLabel: null,
-    slaBreached: false,
-    customerInfo: {
-      name: initialGuestInfo?.name ?? null,
-      email: initialGuestInfo?.email ?? null,
-      phone: initialGuestInfo?.phone ?? null,
-    },
-  }))
+  const [state, setState] = useState<ChatWidgetState>(() => {
+    // ✅ Khôi phục từ localStorage trước (người dùng F5)
+    const storedSid = initialSessionId ?? safeLsGet(LS_KEY_SESSION_ID) ?? null
+    let persistedInfo: { name: string | null; email: string | null; phone: string | null } | null = null
+    try {
+      const raw = safeLsGet(LS_KEY_GUEST_INFO)
+      if (raw) persistedInfo = JSON.parse(raw)
+    } catch { /* ignore */ }
+
+    return {
+      messages: [],
+      status: 'BOT',
+      isSending: false,
+      assignedStaffName: null,
+      escalationReason: null,
+      ratingStars: null,
+      ratingComment: null,
+      ratedAt: null,
+      closedAt: null,
+      sessionId: storedSid,
+      slaLabel: null,
+      slaBreached: false,
+      customerInfo: {
+        name: initialGuestInfo?.name ?? persistedInfo?.name ?? null,
+        email: initialGuestInfo?.email ?? persistedInfo?.email ?? null,
+        phone: initialGuestInfo?.phone ?? persistedInfo?.phone ?? null,
+      },
+    }
+  })
+
+  // ✅ Persist: sessionId thay đổi → ghi xuống localStorage
+  useEffect(() => {
+    safeLsSet(LS_KEY_SESSION_ID, state.sessionId)
+    // Nếu chat đã đóng & khách đã đánh giá xong → cho phép tạo session mới vào lần sau (clear sau 24h tự BE, hoặc ở đây giữ lại để xem lịch sử)
+  }, [state.sessionId])
+
+  // ✅ Persist: customerInfo thay đổi (khách điền tên/SĐT ở GuestInfoForm)
+  useEffect(() => {
+    try {
+      const payload = JSON.stringify(state.customerInfo)
+      safeLsSet(LS_KEY_GUEST_INFO, payload)
+    } catch { /* ignore */ }
+  }, [state.customerInfo.name, state.customerInfo.email, state.customerInfo.phone])
 
   const loadedOnceRef = useRef(false)
+  // ✅ L4: Unique ID counter cho pushMessage (tránh trùng Date.now khi gửi 2 tin same ms)
+  const msgIdCounterRef = useRef<number>(0)
+  const rand4Hex = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1)
 
   const pushMessage = useCallback((role: ChatRole, text: string, createdAt?: string | null, id?: string) => {
     setState((prev) => {
       if (!text || !text.trim()) return prev
+      // Tạo unique ID theo pattern: local-{ts}-{counter}-{rand} (không trùng dù gửi 100 tin/ms)
+      const nextId = (() => {
+        if (id) return id
+        msgIdCounterRef.current = (msgIdCounterRef.current + 1) % 1_000_000
+        const ts = createdAt ? new Date(createdAt).getTime() : Date.now()
+        return `local-${ts}-${msgIdCounterRef.current.toString(36)}-${rand4Hex()}`
+      })()
       return {
         ...prev,
         messages: [
           ...prev.messages,
           {
-            id: id ?? (createdAt ? `${Date.now()}-${role}` : crypto.randomUUID()),
+            id: nextId,
             role,
             text,
             createdAt,
@@ -158,6 +223,7 @@ export function useChat(initialSessionId?: string | null, initialGuestInfo?: { n
 
   useChatSocket(
     state.sessionId,
+    state.customerInfo,
     useCallback((m: ChatMessageItem) => {
       setState((prev) => {
         if (prev.messages.some((x) => x.id === m.id)) return prev
@@ -225,6 +291,11 @@ export function useChat(initialSessionId?: string | null, initialGuestInfo?: { n
           guestPhone: opts?.phone ?? state.customerInfo.phone ?? undefined,
         })
 
+        // ✅ C4: Lưu guestToken BE trả về (dùng cho ownership check sau này)
+        if ((data as any).guestToken) {
+          safeLsSet(LS_KEY_GUEST_TOKEN, String((data as any).guestToken))
+        }
+
         setState((prev) => ({
           ...prev,
           sessionId: data.sessionId,
@@ -269,7 +340,47 @@ export function useChat(initialSessionId?: string | null, initialGuestInfo?: { n
     [state.sessionId, state.customerInfo.email],
   )
 
+  // ✅ M2: Cập nhật thông tin khách vãng lai BẰNG ENDPOINT RIÊNG (KHÔNG lưu thành tin nhắn USER giả)
+  const submitGuestInfo = useCallback(
+    async (info: { name?: string; email?: string; phone?: string }) => {
+      if (!state.sessionId) return { updated: false }
+      // Chỉ gửi những field thật sự đã có thay đổi (có giá trị và khác trạng thái hiện tại)
+      const payload: { sessionId: string; guestName?: string; guestEmail?: string; guestPhone?: string } = {
+        sessionId: state.sessionId,
+      }
+      if (info.name && info.name.trim() !== state.customerInfo.name) payload.guestName = info.name.trim()
+      if (info.email && info.email.trim() !== state.customerInfo.email) payload.guestEmail = info.email.trim()
+      if (info.phone && info.phone.trim() !== state.customerInfo.phone) payload.guestPhone = info.phone.trim()
+      // Không có thay đổi gì → skip gọi API
+      if (!payload.guestName && !payload.guestEmail && !payload.guestPhone) {
+        return { updated: false }
+      }
+      const resp = await customerUpdateGuestInfo(payload)
+      if (resp?.updated) {
+        const s = resp.session as ChatSession
+        setState((prev) => ({
+          ...prev,
+          customerInfo: {
+            name: s.guestName ?? prev.customerInfo.name,
+            email: s.guestEmail ?? prev.customerInfo.email,
+            phone: s.guestPhone ?? prev.customerInfo.phone,
+          },
+        }))
+        // Persist vào localStorage (C4) - stringify trước khi lưu (giống pattern useEffect ở trên 176-181)
+        try {
+          safeLsSet(LS_KEY_GUEST_INFO, JSON.stringify({
+            name: s.guestName ?? state.customerInfo.name,
+            email: s.guestEmail ?? state.customerInfo.email,
+            phone: s.guestPhone ?? state.customerInfo.phone,
+          }))
+        } catch { /* ignore */ }
+      }
+      return resp
+    },
+    [state.sessionId, state.customerInfo],
+  )
+
   const info = useMemo(() => state, [state])
 
-  return { ...info, sendMessage, submitRating, pushMessage }
+  return { ...info, sendMessage, submitRating, submitGuestInfo, pushMessage }
 }

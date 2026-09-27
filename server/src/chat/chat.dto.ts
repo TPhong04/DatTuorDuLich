@@ -29,6 +29,19 @@ export const submitRatingDto = z.object({
 })
 export type SubmitRatingDto = z.infer<typeof submitRatingDto>
 
+// ✅ M2: DTO cập nhật thông tin khách vãng lai (tách riêng - không save thành tin nhắn)
+export const updateGuestInfoDto = z.object({
+  sessionId: objectIdSchema,
+  // Tối thiểu 1 trường phải có (không gửi rỗng)
+  guestName: z.string().min(1).max(100).optional(),
+  guestEmail: z.string().email().max(150).optional(),
+  guestPhone: z.string().min(8).max(20).optional(),
+}).refine(
+  (v) => Boolean(v.guestName || v.guestEmail || v.guestPhone),
+  { message: 'Cần cung cấp ít nhất 1 trong: họ tên, email, số điện thoại', path: ['guestInfo'] }
+)
+export type UpdateGuestInfoDto = z.infer<typeof updateGuestInfoDto>
+
 // ============== STAFF / ADMIN ==============
 
 export const staffReplyDto = z.object({
